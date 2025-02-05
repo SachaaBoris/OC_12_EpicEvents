@@ -1,6 +1,6 @@
 # OC_12 EpicEvents BackEnd CRM  
 
-<p align="center"><img src="https://github.com/SachaaBoris/OC_12_EpicEvents/blob/main/static/softdesk_logo.png" width="346"/></p>
+<p align="center"><img src="https://github.com/SachaaBoris/OC_12_EpicEvents/blob/main/static/logo_w.png" width="346"/></p>
   
 # ● Description du projet  
 EpicEvents CRM est une application de gestion locale, conçue pour collecter, traiter et organiser les données relatives aux clients, contrats et événements. Fonctionnant sous la forme d’une interface en ligne de commande (CLI), elle permet d’effectuer les opérations CRUD sur les utilisateurs, les clients, les contrats et les événements, offrant ainsi un suivi efficace et centralisé.  
