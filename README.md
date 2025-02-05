@@ -14,9 +14,9 @@ EpicEvents CRM est une application de gestion locale, conçue pour collecter, tr
   git clone https://github.com/SachaaBoris/OC_12_EpicEvents.git "local\folder"
   ```  
   
-2. Générer et utiliser une clé secrète Django :  
-	Rendez-vous sur https://djecrety.ir/ et générez une clé que vous pourrez coller dans le fichier .env.sample situé à la racine du projet.  
+2. Configurer l'environement :    
 	Rennomez .env.sample en .env  
+	Editez les différentes variables selon vos préférences / votre config.
 
 3. Démarrer le serveur :  
 	Depuis votre console favorite, rendez-vous dans le dossier d'installation PostGre et executez : `pg_ctl -D chemin\vers\votre\bdd start`
