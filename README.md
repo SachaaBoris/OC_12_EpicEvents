@@ -33,14 +33,16 @@ EpicEvents CRM est une application de gestion locale, conçue pour collecter, tr
   
 # ● Comment utiliser l'application  
 Les différents points d'entrées sont :
---help		  Print l'aide (accessible dans tous les points d'entrées)
-login         Authentification
-logout        Déconnexion
-debug_token   Checking token validity
-users         Gestion des utilisateurs
-customers     Gestion des clients
-contracts     Gestion des contrats
-events		  Gestion des évenements
+| Commande      | Description                                         |
+|--------------|-----------------------------------------------------|
+| `--help`     | Print l'aide (accessible dans tous les points d'entrée) |
+| `login`      | Authentification                                   |
+| `logout`     | Déconnexion                                       |
+| `debug_token`| Vérification de la validité du token              |
+| `users`      | Gestion des utilisateurs                          |
+| `customers`  | Gestion des clients                               |
+| `contracts`  | Gestion des contrats                              |
+| `events`     | Gestion des événements                            |
 
 Exemple de commande : `py epicevents login --username Admin_test --password ADMIN_PASS`  
   
