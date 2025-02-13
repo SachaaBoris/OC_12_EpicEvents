@@ -20,7 +20,7 @@ class User(BaseModel):
     role = ForeignKeyField(Role, backref="list_users", null=True, on_delete="SET NULL")
 
     def save(self, *args, **kwargs):
-        """Saves the user's information with validation checks."""
+        """Saves the user's data with validation checks."""
         self._validate_name()
         self._validate_email()
         self._validate_phone()

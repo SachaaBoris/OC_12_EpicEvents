@@ -16,7 +16,7 @@ class Customer(BaseModel):
     company = ForeignKeyField(Company, backref="customers")
     date_created = DateTimeField(default=datetime.now)
     date_updated = DateTimeField(default=datetime.now)
-    team_contact = ForeignKeyField(
+    team_contact_id = ForeignKeyField(
         User,
         backref="assigned_customers",
         on_delete="SET NULL",
@@ -24,11 +24,12 @@ class Customer(BaseModel):
     )
 
     def save(self, *args, **kwargs):
-        """Saves the customer's information with validation checks."""
+        """Saves the customer's data with validation checks."""
         self._validate_name()
         self._validate_email()
         self._validate_phone()
         self._validate_date()
+        self._validate_team_contact()
         self.date_updated = datetime.now()
         super().save(*args, **kwargs)
 
@@ -52,9 +53,14 @@ class Customer(BaseModel):
     def _validate_date(self):
         """Validates date fields."""
         if isinstance(self.date_created, datetime):
-            return  # Si la date est déjà un objet datetime valide, on passe
+            return
         else:
             raise ValueError("Erreur : La date de création doit être au format datetime valide.")
+
+    def _validate_team_contact(self):
+        """Validates that team contact has a Sales role."""
+        if self.team_contact_id and self.team_contact_id.role.name.lower() != "sales":
+            raise ValueError("Erreur : Vous devez assigner un utilisateur ayant le rôle de 'Commercial'.")
 
     def get_data(self):
         """Returns a dictionary with the customer's information."""
@@ -65,7 +71,7 @@ class Customer(BaseModel):
             "email": self.email,
             "phone": self.phone,
             "company": self.company.name if self.company else None,
-            "team_contact": self.team_contact.get_data() if self.team_contact else None,
             "date_created": self.date_created,
             "date_updated": self.date_updated,
+            "team_contact_id": self.team_contact_id.get_data() if self.team_contact_id else None,
         }

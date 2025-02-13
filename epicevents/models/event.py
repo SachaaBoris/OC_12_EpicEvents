@@ -17,7 +17,7 @@ class Event(BaseModel):
     date_created = DateTimeField(default=datetime.now)
     date_updated = DateTimeField(default=datetime.now)
     notes = TextField(null=True)
-    team_contact = ForeignKeyField(
+    team_contact_id = ForeignKeyField(
         User,
         backref="assigned_events",
         on_delete="SET NULL",
@@ -25,11 +25,12 @@ class Event(BaseModel):
     )
 
     def save(self, *args, **kwargs):
-        """Saves the event's information with validation checks."""
+        """Saves the event's data with validation checks."""
         self._validate_name()
         self._validate_event_date()
         self._validate_attendees()
-        self.date_updated = datetime.now()  # Mise à jour automatique de la date
+        self._validate_team_contact()
+        self.date_updated = datetime.now()
         super().save(*args, **kwargs)
 
     def _validate_name(self):
@@ -39,8 +40,25 @@ class Event(BaseModel):
 
     def _validate_event_date(self):
         """Validates the event date."""
-        if self.event_date < datetime.now():
+        if isinstance(self.event_date, datetime):
+            event_dt = self.event_date
+        else:
+            # Normalising date
+            print(f"DATE : {self.event_date}")
+            self.event_date = self.event_date.strip()
+            if len(self.event_date) == 10:  # Format "YYYY-MM-DD"
+                self.event_date += " 12:00"  # Add default time
+
+            try:
+                event_dt = datetime.strptime(self.event_date, "%Y-%m-%d %H:%M")
+            except ValueError:
+                raise ValueError("Erreur : Format de date invalide. Utilisez 'YYYY-MM-DD HH:MM'.")
+        
+        # Passed date
+        if event_dt < datetime.now():
             raise ValueError("Erreur : La date de l'événement ne peut pas être dans le passé.")
+
+        self.event_date = event_dt
 
     def _validate_attendees(self):
         """Validates the number of attendees."""
@@ -50,9 +68,14 @@ class Event(BaseModel):
     def _validate_date(self):
         """Validates the date."""
         if isinstance(self.date_created, datetime):
-            return  # Si la date est déjà un objet datetime valide, on passe
+            return
         else:
             raise ValueError("Erreur : La date de création doit être au format datetime valide.")
+
+    def _validate_team_contact(self):
+        """Validates that team contact has a Support role."""
+        if self.team_contact_id and self.team_contact_id.role.name.lower() != "support":
+            raise ValueError("Erreur : Vous devez assigner un utilisateur ayant le rôle de 'Support'.")
 
     def get_data(self):
         """Returns a dictionary with the event's information."""
@@ -66,5 +89,5 @@ class Event(BaseModel):
             "notes": self.notes,
             "date_created": self.date_created,
             "date_updated": self.date_updated,
-            "team_contact": self.team_contact.get_data() if self.team_contact else None
+            "team_contact_id": self.team_contact_id.get_data() if self.team_contact_id else None
         }

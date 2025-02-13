@@ -20,7 +20,7 @@ class Contract(BaseModel):
     date_updated = DateTimeField(default=datetime.now)
     amount_total = FloatField()
     amount_due = FloatField(null=True)
-    team_contact = ForeignKeyField(
+    team_contact_id = ForeignKeyField(
         User,
         backref="assigned_contracts",
         on_delete="SET NULL",
@@ -28,10 +28,11 @@ class Contract(BaseModel):
     )
 
     def save(self, *args, **kwargs):
-        """Saves the contract's information with validation checks."""
+        """Saves the contract's data with validation checks."""
         self._validate_signed()
         self._validate_amounts()
         self._validate_date()
+        self._validate_team_contact()
         self.date_updated = datetime.now()
         super().save(*args, **kwargs)
 
@@ -49,9 +50,14 @@ class Contract(BaseModel):
     def _validate_date(self):
         """Validates the date."""
         if isinstance(self.date_created, datetime):
-            return  # Si la date est déjà un objet datetime valide, on passe
+            return
         else:
             raise ValueError("Erreur : La date de création doit être au format datetime valide.")
+
+    def _validate_team_contact(self):
+        """Validates that team contact has a Sales role."""
+        if self.team_contact_id and self.team_contact_id.role.name.lower() != "sales":
+            raise ValueError("Erreur : Vous devez assigner un utilisateur ayant le rôle de 'Commercial'.")
 
     def get_data(self):
         """Returns a dictionary with the contract's information."""
@@ -63,5 +69,5 @@ class Contract(BaseModel):
             "date_updated": self.date_updated,
             "amount_total": self.amount_total,
             "amount_due": self.amount_due if self.amount_due else 0.0,
-            "team_contact": self.team_contact.get_data() if self.team_contact else None
+            "team_contact_id": self.team_contact_id.get_data() if self.team_contact_id else None
         }
