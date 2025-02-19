@@ -85,29 +85,47 @@ def read_contract(
 
 @app.command("list")
 def list_contracts(
-    unsigned: bool = typer.Option(False, "-ns", help="Filtrer les contrats non signés"),
-    unpaid: bool = typer.Option(False, "-up", help="Filtrer les contrats non payés"),
+    ctx: typer.Context,
+    fi: bool = typer.Option(False, "--fi", help="Filtre automatiquement les contrats selon votre rôle"),
 ):
-    """List contracts with filtering options."""
-    query = Contract.select()
-    if unsigned:
-        query = query.where(Contract.signed == False)
-    if unpaid:
-        query = query.where(Contract.amount_due > 0)
-    contracts = list(query)
+    """List all contracts."""
+
+    contracts = Contract.select()
+    nothing_message = "❌ Aucun contrat n'est enregistré dans la bdd."
+
+    if fi:
+        user = ctx.obj
+        
+        if user.role.name == "sales":
+            contracts = contracts.where((Contract.signed == False) | (Contract.amount_due > 0))
+            nothing_message = "❌ Aucun contrat 'problématique' dans la bdd."
+        elif user.role.name in ["admin", "management"]:
+            contracts = contracts.where(Contract.team_contact_id.is_null(True))
+            nothing_message = "❌ Aucun contrat sans agent dans la bdd."
+        else:  # support
+            contracts = contracts.where(Contract.team_contact_id.is_null(False))
+            nothing_message = "❌ Aucun contrat avec agent dans la bdd."
+
+    contracts = list(contracts)
     if not contracts:
         console.print(
-            format_text('bold', 'red', "❌ Aucun contrat trouvé.")
+            format_text('bold', 'red', f"{nothing_message}")
         )
         return
+
     contracts_list = []
+
     for contract in contracts:
+        context = "green"
+
         if not contract.signed:
             context = "orange"
         elif contract.amount_due > 0:
             context = "yellow"
-        else:
-            context = "blue"
+
+        if contract.team_contact_id is None:
+            context = "red"
+
         contracts_list.append(
             {
                 "ID": contract.id,
@@ -118,6 +136,8 @@ def list_contracts(
                 "Contexte": context,
             }
         )
+
+    contracts_list = sorted(contracts_list, key=lambda x: x["ID"], reverse=False)
     display_list("Liste des contrats", contracts_list, use_context=True)
 
 @app.command("update")
@@ -146,13 +166,6 @@ def update_contract(
             console.print(format_text('bold', 'red', f"❌ Erreur : Le client ID {customer_id} n'existe pas."))
             raise typer.Exit()
 
-    if user_id:
-        try:
-            updates["team_contact_id"] = User.get_by_id(user_id)
-        except DoesNotExist:
-            console.print(format_text('bold', 'red', f"❌ Erreur : L'utilisateur ID {user_id} n'existe pas."))
-            raise typer.Exit()
-
     if sum_total is not None:
         updates["amount_total"] = sum_total
 
@@ -161,6 +174,9 @@ def update_contract(
 
     if signed is not None:
         updates["signed"] = signed
+
+    if user_id is not None:
+        updates["team_contact_id"] = user_id
 
     try:
         if updates:

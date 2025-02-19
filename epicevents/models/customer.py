@@ -59,8 +59,11 @@ class Customer(BaseModel):
 
     def _validate_team_contact(self):
         """Validates that team contact has a Sales role."""
-        if self.team_contact_id and self.team_contact_id.role.name.lower() != "sales":
-            raise ValueError("Erreur : Vous devez assigner un utilisateur ayant le rôle de 'Commercial'.")
+        try:
+            if self.team_contact_id and self.team_contact_id.role.name.lower() != "sales":
+                raise ValueError("Erreur : Vous devez assigner un utilisateur ayant le rôle de 'Commercial'.")
+        except DoesNotExist:
+            self.team_contact_id = None
 
     def get_data(self):
         """Returns a dictionary with the customer's information."""

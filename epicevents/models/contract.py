@@ -55,9 +55,12 @@ class Contract(BaseModel):
             raise ValueError("Erreur : La date de création doit être au format datetime valide.")
 
     def _validate_team_contact(self):
-        """Validates that team contact has a Sales role."""
-        if self.team_contact_id and self.team_contact_id.role.name.lower() != "sales":
-            raise ValueError("Erreur : Vous devez assigner un utilisateur ayant le rôle de 'Commercial'.")
+        """Validates that team contact has a Management role."""
+        try:
+            if self.team_contact_id and self.team_contact_id.role.name.lower() != "management":
+                raise ValueError("Erreur : Vous devez assigner un utilisateur ayant le rôle de 'Gestionnaire'.")
+        except DoesNotExist:
+            self.team_contact_id = None
 
     def get_data(self):
         """Returns a dictionary with the contract's information."""

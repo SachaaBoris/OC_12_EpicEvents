@@ -6,6 +6,7 @@ from rich.prompt import Confirm
 from peewee import DoesNotExist
 from dotenv import load_dotenv, set_key, get_key
 from models.user import User
+from models.role import Role
 from cli.utils import authenticate_user
 from cli.utils import generate_token, verify_token, remove_token
 from cli.utils import display_list, format_text
@@ -121,27 +122,40 @@ def read_user(ctx: typer.Context, uid: int = typer.Argument(None, help="ID de l'
         )
 
 @app.command("list")
-def list_users(ctx: typer.Context):
+def list_users(
+    ctx: typer.Context,
+    fi: bool = typer.Option(False, "--fi", help="Filtre automatique des utilisateurs selon votre rôle.")
+):
     """Lists all users."""
-    users = User.select()
+
+    nobody_message = "❌ Aucun utilisateur n'est enregistré dans la bdd."
+
+    if fi:
+        user = ctx.obj
+        users = User.select().join(Role).where(Role.name == user.role.name)
+    else:
+        users = User.select()
 
     if not users.exists():
-        console.print(
-            format_text('bold', 'red', f"❌ Aucun utilisateur trouvé.")
-        )
+        console.print(format_text('bold', 'red', f"{nobody_message}"))
         return
 
-    user_list = [
-        {
+    users_list = []
+    for user in users:
+        context_color = "red" if not user.role else "white"
+
+        users_list.append(
+            {
             "ID": user.id,
             "USERNAME": user.username,
             "EMAIL": user.email,
-            "ROLE": user.role.name,
-        }
-        for user in users
-    ]
+            "ROLE": user.role.name if user.role else "Aucun",
+            "Contexte": context_color,
+            }
+        )
 
-    display_list("Liste des utilisateurs", user_list)
+    users_list = sorted(users_list, key=lambda x: x["ID"], reverse=False)
+    display_list("Liste des utilisateurs", users_list, use_context=True)
 
 @app.command("update")
 def update_user(
@@ -179,14 +193,8 @@ def update_user(
         updates["last_name"] = last_name
     if phone:
         updates["phone"] = phone
-    if role_id:
-        try:
-            updates["role"] = Role.get_by_id(role_id)
-        except DoesNotExist:
-            console.print(
-                format_text('bold', 'red', "❌ Erreur : Rôle invalide.")
-            )
-            raise typer.Exit()
+    if role_id is not None:
+        updates["role"] = role_id
     
     try:
         if updates:

@@ -4,5 +4,5 @@ from .database import BaseModel
 
 
 class Permission(BaseModel):
-    """Represents a CRUD permission (create, read, update, delete)."""
+    """Represents a CRLUD permission (create, read, list, update, delete)."""
     name = CharField(max_length=50, unique=True)

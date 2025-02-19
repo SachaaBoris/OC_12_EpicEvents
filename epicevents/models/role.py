@@ -4,5 +4,5 @@ from .database import BaseModel
 
 
 class Role(BaseModel):
-    """Represents a role in the CRM system (1 Admin, 2 Sales, 3 Support)."""
+    """Represents a role in the CRM system (1 admin, 2 management, 3 sales, 4 support)."""
     name = CharField(max_length=50, unique=True)

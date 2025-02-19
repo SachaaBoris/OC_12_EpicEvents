@@ -2,15 +2,19 @@ import jwt
 import typer
 import sys
 import os
+import time
+import keyboard
 from argon2 import PasswordHasher
 from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
 from typing import Optional
 from models.user import User
+from models.role import Role
 from models.rolepermission import RolePermission
 from models.permission import Permission
 from dotenv import load_dotenv, get_key
+from rich.color import ANSI_COLOR_NAMES
 from rich import print
 from rich.console import Console
 from rich.style import Style
@@ -18,7 +22,11 @@ from rich.table import Table
 from enum import Enum
 
 
+VALID_RICH_COLORS = list(ANSI_COLOR_NAMES.keys())
+
 console = Console()
+app = typer.Typer()
+ph = PasswordHasher()
 
 # AUTH & TOKEN Configuration
 load_dotenv()
@@ -28,24 +36,7 @@ if not JWT_SECRET:
     raise ValueError("La clé secrète JWT n'est pas définie dans les variables d'environnement")
 JWT_ALGORITHM = 'HS256'
 TOKEN_FILE = Path('.jwt')
-app = typer.Typer()
-ph = PasswordHasher()
-
-
-class Entity(Enum):
-    USER = "users"
-    CUSTOMER = "customers"
-    CONTRACT = "contracts"
-    EVENT = "events"
-
-
-class Operation(Enum):
-    CREATE = "create"
-    READ = "read"
-    UPDATE = "update"
-    DELETE = "delete"
-    LIST = "list"
-
+ITEMS_PP = int(get_key(".env", "ITEMS_PER_PAGE"))
 
 def remove_token():
     """Logs out user by removing token"""
@@ -68,9 +59,6 @@ def verify_token() -> Optional[dict]:
     """Verifying stored token validity"""
     try:
         if not TOKEN_FILE.exists():
-            console.print(
-                format_text('bold', 'red', "❌ Token manquant. Veuillez vous connecter.")
-            )
             return None
 
         token = TOKEN_FILE.read_text().strip()
@@ -80,18 +68,12 @@ def verify_token() -> Optional[dict]:
         exp_timestamp = payload['exp']
         if datetime.utcnow().timestamp() > exp_timestamp:
             remove_token()
-            console.print(
-                format_text('bold', 'red', "❌ Token expiré. Veuillez vous reconnecter.")
-            )
             return None
 
         return payload
 
     except jwt.InvalidTokenError:
         remove_token()
-        console.print(
-            format_text('bold', 'red', "❌ Token invalide. Veuillez vous reconnecter.")
-        )
         return None
 
 def authenticate_user(username: str, password: str) -> Optional[dict]:
@@ -113,11 +95,38 @@ def authenticate_user(username: str, password: str) -> Optional[dict]:
         return None
         
     token = generate_token(user)
+    welcome_user()
     return {
         'token': token,
         'user_id': user.id,
         'role': user.role.name
     }
+
+@app.command("debug_rolperm")
+def debug_rolperm():
+    # Displays users permissions
+    users = User.select()
+
+    permissions_list = []
+
+    for user in users:
+        if not user.role:
+            continue
+
+        role = user.role.name
+        permissions = []
+        role_permissions = RolePermission.select().where(RolePermission.role == user.role)
+        for role_permission in role_permissions:
+            permission = role_permission.permission.name
+            permissions.append(permission)
+
+        permissions_list.append({
+            "user": user.username,
+            "role": role,
+            "permissions": ", ".join(permissions)
+        })
+
+    display_list("Liste des permissions", permissions_list)
 
 @app.command("debug_token")
 def debug_token():
@@ -140,48 +149,44 @@ def debug_token():
 
 def check_permission(user: User, entity: str, operation: str, target_id: Optional[int] = None) -> bool:
     """
-    Checks if user can operate on entity.
-    
+    Checks if the user has permission to perform a specific operation on a given entity.
+
     Args:
-        user: actual User
-        entity: target entity
-        operation: CRUDL
-        target_id: self object ID
+        user (User): The user whose permissions are being checked.
+        entity (str): The entity on which the operation is being performed (e.g., "user", "util").
+        operation (str): The operation being performed (e.g., "read", "update", "delete").
+        target_id (Optional[int]): The ID of the target entity. Used for self-access checks.
+
+    Returns:
+        bool: True if the user has the required permission, False otherwise.
     """
-    # Admin can do it all
-    if user.role.name.lower() == "admin":
-        return True
 
-    # Sales rules
-    if user.role.name.lower() == "sales":
-        if entity == Entity.USER.value:
-            # Only on himself
-            return (operation in ["read", "update", "delete"] and 
-                   target_id is not None and 
-                   target_id == user.id)
-        # Full Access to customers, contracts & events
-        return entity in [Entity.CUSTOMER.value, Entity.CONTRACT.value, Entity.EVENT.value]
+    # Special case for the "util" entity: only admins have access
+    if entity == "util":
+        return user.role.name == "admin"
 
-    # Support rules
-    if user.role.name.lower() == "support":
-        if entity == Entity.USER.value:
-            # Only on himself
-            return (operation in ["read", "update", "delete"] and 
-                   target_id is not None and 
-                   target_id == user.id)
-        if entity in [Entity.CUSTOMER.value, Entity.CONTRACT.value]:
-            # ReadOnly customers & contracts
-            return operation in ["read", "list"]
-        if entity == Entity.EVENT.value:
-            return operation != "create"
+    # Check if this is a self-access case (e.g., user updating their own profile)
+    is_self_access = entity == "user" and operation in ["read", "update", "delete"] and target_id == user.id
 
-    return False
+    # Construct permission name based on the entity, operation, and self-access status
+    permission_name = f"{entity}_{operation}_self" if is_self_access else f"{entity}_{operation}"
+
+    # Fetch permission from database
+    permission = Permission.get_or_none(Permission.name == permission_name)
+
+    # Check if user's role has the required permission
+    role_permission = RolePermission.get_or_none(
+        (RolePermission.role == user.role) &
+        (RolePermission.permission == permission.id)
+    )
+
+    return role_permission is not None
 
 def get_target_id_from_args(args) -> Optional[int]:
     """Extract target ID from command arguments."""
     if args and len(args) > 0:
         try:
-            return int(args[-1])  # Prendre le dernier argument
+            return int(args[-1])  # last arg
         except ValueError:
             return None
     return None
@@ -190,7 +195,7 @@ def check_auth(ctx: typer.Context) -> None:
     """Checks that user is authentified and allowed before each command."""
     command: str | None = ctx.invoked_subcommand
     
-    if command in ["users create", "login", "logout"]:
+    if command in ["login", "logout"]:
         return
     
     user: User | None = is_logged()
@@ -198,6 +203,7 @@ def check_auth(ctx: typer.Context) -> None:
         console.print(format_text('bold', 'red', "❌ Vous devez être connecté pour exécuter cette commande."))
         raise typer.Exit(1)
 
+    ctx.obj = user
     entity = ctx.info_name
     operation = command 
     target_id = get_target_id_from_args(sys.argv)
@@ -218,61 +224,97 @@ def is_logged() -> User | None:
 
     return User.get_or_none(User.id == payload.get("user_id"))
 
+def validate_rich_color(color=None):
+    """Returns a rich valid color anyways"""
+    valid_colors = VALID_RICH_COLORS if isinstance(VALID_RICH_COLORS, list) else ["white"]
+    if not isinstance(color, str) or color not in valid_colors:
+        return "white"
+    return color
+
 def display_list(title: str, items: list, use_context: bool = False):
-    """Displays a list of records."""
+    """Displays a list of records with pagination."""
 
     # See https://rich.readthedocs.io/en/stable/protocol.html?highlight=__rich__#console-customization
 
-    table = Table(
-        title=title,
-        padding=(0, 1),
-        header_style="blue bold",
-        title_style="purple bold",
-        title_justify="center",
-    )
+    items_per_page = ITEMS_PP
+    total_items = len(items)
+    total_pages = (total_items + items_per_page - 1) // items_per_page
+    current_page = 1 
 
-    if not items:
-        console.print(format_text('bold', 'red', "❌ Aucun élément à afficher."))
-        return
+    while current_page <= total_pages:
+        start_index = (current_page - 1) * items_per_page
+        end_index = min(start_index + items_per_page, total_items)
+        page_items = items[start_index:end_index]
+        title_str = title if total_pages <= 1 else f"{title} (Page {current_page}/{total_pages})"
+        
+        table = Table(
+            title=title_str,
+            padding=(0, 1),
+            header_style="blue bold",
+            title_style="purple bold",
+            title_justify="center",
+        )
 
-    headers = list(items[0].keys())
+        if not page_items:
+            console.print(format_text('bold', 'red', "❌ Aucun élément à afficher."))
+            return
 
-    if "Contexte" in headers:
-        headers.remove("Contexte")
+        headers = list(page_items[0].keys())
 
-    for title in headers:
-        table.add_column(title, style="cyan", justify="center")
+        if "Contexte" in headers:
+            headers.remove("Contexte")
 
-    for item in items:
-        values = [str(item[key]) for key in headers]
-        style = item.get("Contexte", "white") if use_context else "white"
-        table.add_row(*values, style=style)
+        for header in headers:
+            table.add_column(header, style="cyan", justify="center")
 
-    console = Console()
-    print("")
-    console.print(table)
+        for item in page_items:
+            values = [str(item[key]) for key in headers]
+            color = validate_rich_color(item.get("Contexte", "white"))
+            style = color if use_context else "white"
+            table.add_row(*values, style=style)
+
+        console.print(table)
+
+        if current_page < total_pages:
+            console.print(format_text('bold', 'yellow', "Appuyez sur 'Backspace' pour continuer, 'Echap' pour quitter."))
+            time.sleep(0.2)
+
+            # Wait for user input
+            while True:
+                if keyboard.is_pressed('backspace'):
+                    current_page += 1
+                    time.sleep(0.2)
+                    break
+                elif keyboard.is_pressed('escape'):
+                    time.sleep(0.2)
+                    return
+                time.sleep(0.1)
+        else:
+            current_page += 1
 
 def format_text(style: str, color: str, text: str) -> None:
     """
-        Formats text with a Rich style and color.
+    Formats text with a Rich style and color.
 
-        Args:
-            style (str): Text style ('bold', 'italic', 'underline', 'strike', or 'normal')
-            color (str): Desired color
-            text (str): Text to format
+    Args:
+        style (str): Text style ('bold', 'italic', 'underline', 'strike', or 'normal')
+        color (str): Desired color
+        text (str): Text to format
 
-        Returns:
-            str: Text formatted with Rich tags
+    Returns:
+        str: Text formatted with Rich tags
 
-        Examples:
-            error_text = format_text('bold', 'red', '❌ Error: Invalid role.')
-            confirm = Confirm.ask(format_text('bold', 'yellow', '⚠ Confirmation required'))
-            italic_warning = format_text('italic', 'red', 'Warning')
-            underlined_text = format_text('underline', 'green', 'Important')
-            striked_text = format_text('strike', 'red', 'Deleted')
-            normal_text = format_text('normal', 'blue', 'Normal text')
-        """
-    valid_colors = ['red', 'yellow', 'green', 'blue', 'purple', 'orange', 'brown']
+    Examples:
+        error_text = format_text('bold', 'red', '❌ Error: Invalid role.')
+        confirm = Confirm.ask(format_text('bold', 'yellow', '⚠ Confirmation required'))
+        italic_warning = format_text('italic', 'red', 'Warning')
+        underlined_text = format_text('underline', 'green', 'Important')
+        striked_text = format_text('strike', 'red', 'Deleted')
+        normal_text = format_text('normal', 'blue', 'Normal text')
+    """
+
+    color = validate_rich_color(color)
+
     style_map = {
         'bold': 'bold',
         'italic': 'italic',
@@ -280,21 +322,35 @@ def format_text(style: str, color: str, text: str) -> None:
         'strike': 'strike'
     }
 
-    if style == 'normal' and color in valid_colors:
-        return f"[{color}]{text}[/{color}]"
-
     valid_style = style in style_map
-    valid_color = color in valid_colors
-
-    if not valid_style and not valid_color:
-        return text
-
-    if not valid_style and valid_color:
+    if style == 'normal' or not valid_style:
         return f"[{color}]{text}[/{color}]"
-
-    if valid_style and not valid_color:
-        style_tag = style_map[style]
-        return f"[{style_tag}]{text}[/{style_tag}]"
 
     style_tag = style_map[style]
     return f"[{style_tag} {color}]{text}[/{style_tag} {color}]"
+
+def welcome_user():
+    print("")
+    print("                        ###    ")
+    print("                      ###      ")
+    print("       ################    ####")
+    print("       #          ###         #")
+    print("       #        ###           #")
+    print("       #      ###             #")
+    print("       #    ###      ###      #")
+    print("       #  ###      ###        #")
+    print("       #         ###     ###  #")
+    print("       #       ###     ###    #")
+    print("       #     ###     ###      #")
+    print("       #           ###        #")
+    print("       #         ###          #")
+    print("       #####   ################")
+    print("             ###               ")
+    print("           ###                 ")
+    print("")
+    print("        WELCOME TO EPICEVENTS")
+    print("  Customer Relationship Management")
+    print("")
+
+
+

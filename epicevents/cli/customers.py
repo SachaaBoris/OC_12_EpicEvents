@@ -8,6 +8,7 @@ from models.customer import Customer
 from models.company import Company
 from models.user import User
 from cli.utils import display_list, format_text
+from cli.utils import is_logged
 
 
 app = typer.Typer(help="Gestion des clients")
@@ -20,6 +21,7 @@ def create_company(company_name: str) -> int:
 
 @app.command("create")
 def create_customer(
+    ctx: typer.Context,
     first_name: str = typer.Option(..., "-fn", help="Prénom du client"),
     last_name: str = typer.Option(..., "-ln", help="Nom du client"),
     email: str = typer.Option(..., "-e", help="Adresse mail du client"),
@@ -28,6 +30,12 @@ def create_customer(
     contact_id: int = typer.Option(0, "-u", help="Numéro du commercial en charge"),
 ):
     """Creates a new customer."""
+
+    user = ctx.obj
+
+    # If "sales" & no contact_id given, auto-assign to user.id
+    if user.role.name == "sales" and contact_id == 0:
+        contact_id = user.id
 
     # Checks if customer already exists
     if Customer.select().where(Customer.email == email).exists():
@@ -85,29 +93,56 @@ def read_customer(customer_id: int = typer.Argument(None, help="ID du client à 
         raise typer.Exit()
 
 @app.command("list")
-def list_customers():
+def list_customers(
+    ctx: typer.Context,
+    fi: bool = typer.Option(False, "--fi", help="Filtre automatiquement les clients selon votre rôle")
+):
     """Lists all customers."""
     customers = Customer.select().join(Company, on=(Customer.company_id == Company.id))
+    nobody_message = "❌ Aucun client n'est enregistré dans la bdd."
+
+    if fi:
+        user = ctx.obj
+        if user.role.name == "sales":
+            customers = customers.where(Customer.team_contact_id == user.id)
+            nobody_message = "❌ Aucun client ne vous est attribué."
+        elif user.role.name in ["admin", "management"]:
+            customers = customers.where(Customer.team_contact_id.is_null(True))
+            nobody_message = "❌ Aucun client sans agent n'est enregistré dans la bdd."
+        else:  # support
+            customers = customers.where(Customer.team_contact_id.is_null(False)) 
+            nobody_message = "❌ Aucun client avec agent n'est enregistré dans la bdd."         
 
     if not customers.exists():
-        console.print(
-            format_text('bold', 'red', "❌ Aucun client n'est enregistré dans la bdd.")
-        )
+        console.print(format_text('bold', 'red', f"{nobody_message}"))
         return
 
-    customers_list = [
-        {
-            "ID": customer.id,
-            "FIRST NAME": customer.first_name,
-            "LAST NAME": customer.last_name.upper(),
-            "EMAIL": customer.email,
-            "COMPANY": customer.company.name,
-            "EPIC CONTACT": f"{customer.team_contact_id.first_name} {customer.team_contact_id.last_name.upper()} ({customer.team_contact_id.id})" if isinstance(customer.team_contact_id, User) else f"ID: {customer.team_contact_id}" if customer.team_contact_id else "Aucun",
-        }
-        for customer in customers
-    ]
+    customers_list = []
+    for customer in customers:
+        contact_info = "Aucun"
+        context_color = "red"
 
-    display_list("Liste des utilisateurs", customers_list)
+        if isinstance(customer.team_contact_id, User):
+            contact_info = f"{customer.team_contact_id.first_name} {customer.team_contact_id.last_name.upper()} ({customer.team_contact_id.id})"
+            context_color = "white"
+        elif customer.team_contact_id:
+             contact_info = f"ID: {customer.team_contact_id}"
+             context_color = "orange"
+
+        customers_list.append(
+            {
+                "ID": customer.id,
+                "FIRST NAME": customer.first_name,
+                "LAST NAME": customer.last_name.upper(),
+                "EMAIL": customer.email,
+                "COMPANY": customer.company.name,
+                "EPIC CONTACT": contact_info,
+                "Contexte": context_color,
+            }
+        )
+
+    customers_list = sorted(customers_list, key=lambda x: x["ID"], reverse=False)
+    display_list("Liste des utilisateurs", customers_list, use_context=True)
 
 @app.command("update")
 def update_customer(

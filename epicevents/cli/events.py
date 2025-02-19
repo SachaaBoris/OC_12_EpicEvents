@@ -65,54 +65,70 @@ def read_event(event_id: int = typer.Argument(..., help="ID de l'événement à 
         raise typer.Exit()
 
 @app.command("list")
-def list_events():
+def list_events(
+    ctx: typer.Context,
+    fi: bool = typer.Option(False, "--fi", help="Filtre automatiquement les événement selon votre rôle")
+):
     """List all events."""
-
     events = Event.select()
+    current_date = datetime.now()
+    nothing_message = "❌ Aucun événement n'est enregistré dans la bdd."
+
+    if fi:
+        user = ctx.obj
+        if user.role.name == "sales":
+            events = events.where(Event.event_date > current_date)
+            nothing_message = "❌ Aucun événement futur n'est enregistré dans la bdd."
+        elif user.role.name in ["admin", "management"]:
+            events = events.where(Event.team_contact_id.is_null(True))
+            nothing_message = "❌ Aucun événement sans agent n'est enregistré dans la bdd."
+        else:  # support
+            events = events.where(Event.team_contact_id == user.id)
+            nothing_message = "❌ Aucun événement avec agent n'est enregistré dans la bdd."
+
     if not events.count():
-        console.print(format_text('bold', 'red', "❌ Aucun événement n'est enregistré dans la bdd."))
+        console.print(format_text('bold', 'red', f"{nothing_message}"))
         return
 
     # Ordering events for display
-    current_date = datetime.now()
     future_events = []
     past_events = []
-
     for event in events:
         if event.event_date > current_date:
             future_events.append(event)
         else:
             past_events.append(event)
-
     future_events.sort(key=lambda x: x.event_date)
     past_events.sort(key=lambda x: x.event_date, reverse=True)
 
     event_list = []
-
     # Future Events
     for event in future_events:
+        context_color = "red" if event.team_contact_id is None else "blue"
         event_list.append(
             {
                 "ID": event.id,
                 "Date": event.event_date,
                 "Nom": event.name,
                 "Participants": event.attendees,
-                "Contexte": "blue",
+                "Contexte": context_color,
             }
         )
 
     # Past Events
     for event in past_events:
+        context_color = "red" if event.team_contact_id is None else "wheat4"
         event_list.append(
             {
                 "ID": event.id,
                 "Date": event.event_date,
                 "Nom": event.name,
                 "Participants": event.attendees,
-                "Contexte": "brown",
+                "Contexte": context_color,
             }
         )
 
+    event_list = sorted(event_list, key=lambda x: x["ID"], reverse=False)
     display_list("Liste des événements", event_list, use_context=True)
 
 @app.command("update")

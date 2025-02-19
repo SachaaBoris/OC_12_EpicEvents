@@ -1,3 +1,4 @@
+from create_test_data import create_test_data
 from dotenv import get_key
 from models.database import psql_db
 from models.role import Role
@@ -13,74 +14,90 @@ from models.event import Event
 ADMIN_EMAIL = get_key(".env", "ADMIN_EMAIL")
 ADMIN_PASSWORD = get_key(".env", "ADMIN_PASSWORD")
 
-try:
-    """Connecting to the database."""
-    psql_db.connect()
-    print("✅ Connection to the database established successfully.")
-except Exception as e:
-    print(f"❌ Failed to connect to the database: {e}")
-    exit(1)
-
-try:
-    """Table creation."""
-    psql_db.create_tables([Role, Permission, RolePermission, User, Company, Customer, Contract, Event])
-    print("✅ Tables created successfully.")
-except Exception as e:
-    print(f"❌ Failed to create tables: {e}")
-    exit(1)
-
-try:
-    """Initializes roles and permissions in the database."""
-    roles = ["admin", "sales", "support"]
-    permissions = ["create", "read", "update", "delete"]
-
-    # Creating roles
-    role_objs = {role: Role.get_or_create(name=role)[0] for role in roles}
-
-    # Creating permissions
-    perm_objs = {perm: Permission.get_or_create(name=perm)[0] for perm in permissions}
-
-    # Permissions and role attribution
-    role_permissions = {
-        "admin": list(permissions),
-        "sales": ["create", "read", "update"],
-        "support": ["read", "update"],
-    }
-
-    for role, perms in role_permissions.items():
-        for perm in perms:
-            RolePermission.get_or_create(role=role_objs[role], permission=perm_objs[perm])
-
-    print("✅ Roles and permissions created successfully!")
-except Exception as e:
-    print(f"❌ Failed to create roles and permissions: {e}")
-    exit(1)
-
-# Creating test users
-test_users = [
-    ("Admin_test", "ADMIN_PASS", "Admin", "Test", "admin_test@email.com", "0102030405", "admin"),
-    ("Sales_test", "SALES_PASS", "Sales", "Test", "sales_test@email.com", "0102030405", "sales"),
-    ("Support_test", "SUPPORT_PASS", "Support", "Test", "support_test@email.com", "0102030405", "support"),
-]
-
-for username, password, first_name, last_name, email, phone, role in test_users:
+def create_db():
     try:
-        User.create(
-            username=username,
-            password=password,
-            first_name=first_name,
-            last_name=last_name,
-            email=email,
-            phone=phone,
-            role=Role.get(name=role)  # FK
-        )
-        print(f"✅ {role.capitalize()} user created successfully.")
+        """Connecting to the database."""
+        psql_db.connect()
+        print("✅ Connection to the database established successfully.")
     except Exception as e:
-        print(f"❌ Failed to create {role} user: {e}")
+        print(f"❌ Failed to connect to the database: {e}")
+        exit(1)
 
-try:
-    """Closing the database."""
-    psql_db.close()
-    print("✅ Database connection closed.")
-except Exception as e:
-    print(f"❌ Failed to close the database connection: {e}")
+    try:
+        """Table creation."""
+        psql_db.create_tables([Role, Permission, RolePermission, User, Company, Customer, Contract, Event])
+        print("✅ Tables created successfully.")
+    except Exception as e:
+        print(f"❌ Failed to create tables: {e}")
+        exit(1)
+
+    try:
+        """Initializes roles and permissions in the database."""
+        roles = ["admin", "management", "sales", "support"]
+        settings = ["user", "customer", "contract", "event"]
+        actions = ["create", "read", "list", "update", "delete"]
+
+        role_objs = {role: Role.get_or_create(name=role)[0] for role in roles}
+
+        # Creates `setting_action` permissions (ex: `user_create`)
+        perm_objs = {}
+        for setting in settings:
+            for action in actions:
+                perm_name = f"{setting}_{action}"
+                perm_objs[perm_name] = Permission.get_or_create(name=perm_name)[0]
+
+        perm_objs["user_read_self"] = Permission.get_or_create(name="user_read_self")[0]
+        perm_objs["user_update_self"] = Permission.get_or_create(name="user_update_self")[0]
+        perm_objs["user_delete_self"] = Permission.get_or_create(name="user_delete_self")[0]
+        
+        # Give roles permissions
+        role_permissions = {
+            "admin": list(perm_objs.keys()),  # full access
+
+            "management": [
+                "user_create", "user_read", "user_read_self", "user_list", "user_update", "user_update_self", "user_delete", "user_delete_self",
+                "customer_read", "customer_list",
+                "contract_create", "contract_read", "contract_list", "contract_update",
+                "event_read", "event_list", "event_update", "event_delete"
+            ],
+
+            "sales": [
+                "user_read_self","user_list", "user_update_self", "user_delete_self",
+                "customer_create", "customer_read", "customer_list", "customer_update",
+                "contract_read", "contract_list", "contract_update",
+                "event_create", "event_read", "event_list", "event_update"
+            ],
+
+            "support": [
+                "user_read_self","user_list", "user_update_self", "user_delete_self",
+                "customer_read", "customer_list",
+                "contract_read", "contract_list",
+                "event_read", "event_list", "event_update"
+            ],
+        }
+
+        for role, perms in role_permissions.items():
+            for perm in perms:
+                RolePermission.get_or_create(role=role_objs[role], permission=perm_objs[perm])
+
+        print("✅ Roles and permissions created successfully!")
+    except Exception as e:
+        print(f"❌ Failed to create roles and permissions: {e}")
+        exit(1)
+
+    try:
+        """Closing the database."""
+        psql_db.close()
+        print("✅ Database connection closed.")
+    except Exception as e:
+        print(f"❌ Failed to close the database connection: {e}")
+
+
+def prompt_create_test_data():
+    user_input = input("Voulez-vous créer des données de test ? (o/n) : ").strip().lower()
+    if user_input == "o":
+        create_test_data()
+
+if __name__ == "__main__":
+    create_db()
+    prompt_create_test_data()

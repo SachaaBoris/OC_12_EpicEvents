@@ -8,7 +8,6 @@ from .role import Role
 
 ph = PasswordHasher()
 
-
 class User(BaseModel):
     """Represents a user in the CRM system."""
     username = CharField(max_length=25, unique=True)
@@ -17,13 +16,14 @@ class User(BaseModel):
     first_name = CharField(max_length=25)
     last_name = CharField(max_length=25)
     phone = CharField(max_length=25)
-    role = ForeignKeyField(Role, backref="list_users", null=True, on_delete="SET NULL")
+    role = ForeignKeyField(Role, backref="list_users", on_delete="SET NULL")
 
     def save(self, *args, **kwargs):
         """Saves the user's data with validation checks."""
         self._validate_name()
         self._validate_email()
         self._validate_phone()
+        self._validate_role()
 
         # Hashing password if not already hashed
         if not self.password.startswith("$argon2id$"):
@@ -47,6 +47,14 @@ class User(BaseModel):
         pattern = r"^\+?[0-9]{7,15}$"
         if not re.match(pattern, self.phone):
             raise ValueError("Erreur : Veuillez entrer un numéro de téléphone valide.")
+
+    def _validate_role(self):
+        """Validates user role."""
+        if not self.role:
+            raise ValueError("Erreur : L'utilisateur doit avoir un rôle assigné.")
+
+        if self.role.name.lower() not in ["admin", "management", "sales", "support"]:
+            raise ValueError("Erreur : Le rôle doit être 'admin' (1), 'management' (2), 'sales' (3) ou 'support' (4).")
 
     def verify_password(self, password: str) -> bool:
         """Checks input password equals saved."""

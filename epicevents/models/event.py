@@ -74,8 +74,11 @@ class Event(BaseModel):
 
     def _validate_team_contact(self):
         """Validates that team contact has a Support role."""
-        if self.team_contact_id and self.team_contact_id.role.name.lower() != "support":
-            raise ValueError("Erreur : Vous devez assigner un utilisateur ayant le rôle de 'Support'.")
+        try:
+            if self.team_contact_id and self.team_contact_id.role.name.lower() != "support":
+                raise ValueError("Erreur : Vous devez assigner un utilisateur ayant le rôle de 'Support'.")
+        except DoesNotExist:
+            self.team_contact_id = None
 
     def get_data(self):
         """Returns a dictionary with the event's information."""
