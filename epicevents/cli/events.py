@@ -5,11 +5,12 @@ from rich.console import Console
 from rich.prompt import Confirm
 from peewee import DoesNotExist
 from typing import Optional
-from models.event import Event
-from models.contract import Contract
-from models.customer import Customer
-from models.user import User
-from cli.utils import display_list, format_text
+from epicevents.models.event import Event
+from epicevents.models.contract import Contract
+from epicevents.models.customer import Customer
+from epicevents.models.user import User
+from epicevents.cli.utils import display_list
+from epicevents.cli.utils import format_text
 
 
 app = typer.Typer(help="Gestion des événements")
@@ -67,14 +68,14 @@ def read_event(event_id: int = typer.Argument(..., help="ID de l'événement à 
 @app.command("list")
 def list_events(
     ctx: typer.Context,
-    fi: bool = typer.Option(False, "--fi", help="Filtre automatiquement les événement selon votre rôle")
+    filter_on: bool = typer.Option(False, "--fi", help="Filtre automatiquement les événement selon votre rôle")
 ):
     """List all events."""
     events = Event.select()
     current_date = datetime.now()
     nothing_message = "❌ Aucun événement n'est enregistré dans la bdd."
 
-    if fi:
+    if filter_on:
         user = ctx.obj
         if user.role.name == "sales":
             events = events.where(Event.event_date > current_date)

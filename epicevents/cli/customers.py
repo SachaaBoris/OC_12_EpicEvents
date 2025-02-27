@@ -4,11 +4,12 @@ from datetime import datetime
 from rich.console import Console
 from rich.prompt import Confirm
 from peewee import DoesNotExist
-from models.customer import Customer
-from models.company import Company
-from models.user import User
-from cli.utils import display_list, format_text
-from cli.utils import is_logged
+from epicevents.models.customer import Customer
+from epicevents.models.company import Company
+from epicevents.models.user import User
+from epicevents.cli.auth import is_logged
+from epicevents.cli.utils import display_list
+from epicevents.cli.utils import format_text
 
 
 app = typer.Typer(help="Gestion des clients")
@@ -95,13 +96,13 @@ def read_customer(customer_id: int = typer.Argument(None, help="ID du client à 
 @app.command("list")
 def list_customers(
     ctx: typer.Context,
-    fi: bool = typer.Option(False, "--fi", help="Filtre automatiquement les clients selon votre rôle")
+    filter_on: bool = typer.Option(False, "--fi", help="Filtre automatiquement les clients selon votre rôle")
 ):
     """Lists all customers."""
     customers = Customer.select().join(Company, on=(Customer.company_id == Company.id))
     nobody_message = "❌ Aucun client n'est enregistré dans la bdd."
 
-    if fi:
+    if filter_on:
         user = ctx.obj
         if user.role.name == "sales":
             customers = customers.where(Customer.team_contact_id == user.id)

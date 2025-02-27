@@ -1,9 +1,9 @@
 import re
 from datetime import datetime, timedelta, timezone
 from peewee import *
-from .database import BaseModel
-from .contract import Contract
-from .user import User
+from epicevents.models.database import BaseModel
+from epicevents.models.contract import Contract
+from epicevents.models.user import User
 
 
 class Event(BaseModel):

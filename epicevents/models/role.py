@@ -1,6 +1,6 @@
 import re
 from peewee import *
-from .database import BaseModel
+from epicevents.models.database import BaseModel
 
 
 class Role(BaseModel):

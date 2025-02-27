@@ -5,11 +5,16 @@ from rich.console import Console
 from rich.prompt import Confirm
 from peewee import DoesNotExist
 from dotenv import load_dotenv, set_key, get_key
-from models.user import User
-from models.role import Role
-from cli.utils import authenticate_user
-from cli.utils import generate_token, verify_token, remove_token
-from cli.utils import display_list, format_text
+from epicevents.models.user import User
+from epicevents.models.role import Role
+from epicevents.cli.auth import AuthenticationError
+from epicevents.cli.auth import authenticate_user
+from epicevents.cli.auth import generate_token
+from epicevents.cli.auth import verify_token
+from epicevents.cli.auth import remove_token
+from epicevents.cli.utils import display_list
+from epicevents.cli.utils import format_text
+
 
 
 app = typer.Typer(help="Gestion des utilisateurs")
@@ -23,10 +28,11 @@ def login(
 ):
     """Authenticates user through CLI"""
     try:
-        result = authenticate_user(username, password)
-        console.print(
-            format_text('bold', 'green', f"✅ Connecté en tant que {username} (rôle: {result['role']})")
-        )
+        user_obj = authenticate_user(username, password)
+        if user_obj:
+            console.print(
+                format_text('bold', 'green', f"✅ Connecté en tant que {username} (rôle: {user_obj['role']})")
+            )
     except AuthenticationError as e:
         console.print(
             format_text('bold', 'red', f"❌ Erreur d'authentification : {str(e)}")
@@ -58,7 +64,7 @@ def create_user(
     first_name: str = typer.Option(..., "-fn", help="Prénom"),
     last_name: str = typer.Option(..., "-ln", help="Nom"),
     phone: str = typer.Option(..., "-ph", help="Téléphone"),
-    role_id: int = typer.Option(..., "-r", help="Numéro de rôle (1: Admin, 2: Sales, 3: Support)")
+    role_id: int = typer.Option(..., "-r", help="Numéro de rôle (1: Admin, 2: Management, 3: Sales, 4: Support)")
 ):
     """Creates a new user."""
 
@@ -124,13 +130,13 @@ def read_user(ctx: typer.Context, uid: int = typer.Argument(None, help="ID de l'
 @app.command("list")
 def list_users(
     ctx: typer.Context,
-    fi: bool = typer.Option(False, "--fi", help="Filtre automatique des utilisateurs selon votre rôle.")
+    filter_on: bool = typer.Option(False, "--fi", help="Filtre automatique des utilisateurs selon votre rôle.")
 ):
     """Lists all users."""
 
     nobody_message = "❌ Aucun utilisateur n'est enregistré dans la bdd."
 
-    if fi:
+    if filter_on:
         user = ctx.obj
         users = User.select().join(Role).where(Role.name == user.role.name)
     else:

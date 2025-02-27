@@ -2,8 +2,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from peewee import *
 from argon2 import PasswordHasher
-from .database import BaseModel
-from .role import Role
+from epicevents.models.database import BaseModel
+from epicevents.models.role import Role
 
 
 ph = PasswordHasher()
