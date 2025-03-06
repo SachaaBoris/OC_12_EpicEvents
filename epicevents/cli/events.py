@@ -51,6 +51,32 @@ def read_event(event_id: int = typer.Argument(..., help="ID de l'événement à 
 
     try:
         event = Event.get_by_id(event_id)
+
+        # Handle relationship for event contact
+        event_contact = f"{event.team_contact_id.first_name} {event.team_contact_id.last_name.upper()} ({event.team_contact_id.id})" if isinstance(event.team_contact_id, User) else f"ID: {event.team_contact_id}" if event.team_contact_id else "Aucun"
+
+        # Access contract
+        contract = event.contract
+        contract_id = contract.id if contract else "Aucun"
+
+        # Access contract contact
+        contract_contact = "Aucun"
+        if contract and contract.team_contact_id:
+            user = contract.team_contact_id
+            contract_contact = f"{user.first_name} {user.last_name.upper()} ({user.id})"
+
+        # Access customer through contract
+        customer_id = "Aucun"
+        customer_contact = "Aucun"
+        if contract and contract.customer:
+            customer = contract.customer
+            customer_id = customer.id
+
+            # Access customer contact
+            if customer.team_contact_id:
+                user = customer.team_contact_id
+                customer_contact = f"{user.first_name} {user.last_name.upper()} ({user.id})"
+
         event_data = [
             {"Champ": "ID", "Valeur": event.id},
             {"Champ": "Date", "Valeur": event.event_date},
@@ -59,6 +85,10 @@ def read_event(event_id: int = typer.Argument(..., help="ID de l'événement à 
             {"Champ": "Participants", "Valeur": event.attendees},
             {"Champ": "Notes", "Valeur": event.notes},
             {"Champ": "Contact Epic", "Valeur": f"{event.team_contact_id.first_name} {event.team_contact_id.last_name.upper()} ({event.team_contact_id.id})" if isinstance(event.team_contact_id, User) else f"ID: {event.team_contact_id}" if event.team_contact_id else "Aucun"},
+            {"Champ": "Contrat ID", "Valeur": f" {contract_id}"},
+            {"Champ": "Contact du contrat", "Valeur": f" {contract_contact}"},
+            {"Champ": "Customer ID", "Valeur": f" {customer_id}"},
+            {"Champ": "Contact du client", "Valeur": f" {customer_contact}"},
         ]
         display_list(f"Événement {event.id} : {event.name}", event_data)
     except DoesNotExist:
@@ -74,18 +104,22 @@ def list_events(
     events = Event.select()
     current_date = datetime.now()
     nothing_message = "❌ Aucun événement n'est enregistré dans la bdd."
+    title_str = "Liste des événements"
 
     if filter_on:
         user = ctx.obj
         if user.role.name == "sales":
             events = events.where(Event.event_date > current_date)
             nothing_message = "❌ Aucun événement futur n'est enregistré dans la bdd."
+            title_str = title_str + " (Futurs)"
         elif user.role.name in ["admin", "management"]:
             events = events.where(Event.team_contact_id.is_null(True))
             nothing_message = "❌ Aucun événement sans agent n'est enregistré dans la bdd."
+            title_str = title_str + " (Sans agents attribués)"
         else:  # support
             events = events.where(Event.team_contact_id == user.id)
-            nothing_message = "❌ Aucun événement avec agent n'est enregistré dans la bdd."
+            nothing_message = "❌ Aucun événement ne vous est attribué."
+            title_str = title_str + " (Attribués)"
 
     if not events.count():
         console.print(format_text('bold', 'red', f"{nothing_message}"))
@@ -130,7 +164,7 @@ def list_events(
         )
 
     event_list = sorted(event_list, key=lambda x: x["ID"], reverse=False)
-    display_list("Liste des événements", event_list, use_context=True)
+    display_list(title_str, event_list, use_context=True)
 
 @app.command("update")
 def update_event(

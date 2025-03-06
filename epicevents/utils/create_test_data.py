@@ -27,9 +27,12 @@ def create_users():
     """Creates a user per role."""
     test_users = [
         ("Admin_test", "ADMIN_PASS", "Admin", "Test", "admin_test@email.com", "0102030405", "admin"),
-        ("Manage_test", "MANAGE_PASS", "Management", "Test", "manage_test@email.com", "0102030405", "management"),
-        ("Sales_test", "SALES_PASS", "Sales", "Test", "sales_test@email.com", "0102030405", "sales"),
-        ("Support_test", "SUPPORT_PASS", "Support", "Test", "support_test@email.com", "0102030405", "support"),
+        ("Manage_test1", "MANAGE_PASS1", "Management", "Test_One", "manage_test1@email.com", "0102030405", "management"),
+        ("Sales_test1", "SALES_PASS1", "Sales", "Test_One", "sales_test1@email.com", "0102030405", "sales"),
+        ("Support_test1", "SUPPORT_PASS1", "Support", "Test_One", "support_test1@email.com", "0102030405", "support"),
+        ("Manage_test2", "MANAGE_PASS2", "Management", "Test_Two", "manage_test2@email.com", "0102030405", "management"),
+        ("Sales_test2", "SALES_PASS2", "Sales", "Test_Two", "sales_test2@email.com", "0102030405", "sales"),
+        ("Support_test2", "SUPPORT_PASS2", "Support", "Test_Two", "support_test2@email.com", "0102030405", "support"),
     ]
     for username, password, first_name, last_name, email, phone, role in test_users:
         try:

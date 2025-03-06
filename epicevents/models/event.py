@@ -14,8 +14,6 @@ class Event(BaseModel):
     location = CharField(max_length=150)
     event_date = DateTimeField()
     attendees = IntegerField()
-    date_created = DateTimeField(default=datetime.now)
-    date_updated = DateTimeField(default=datetime.now)
     notes = TextField(null=True)
     team_contact_id = ForeignKeyField(
         User,
@@ -23,20 +21,30 @@ class Event(BaseModel):
         on_delete="SET NULL",
         null=True
     )
+    date_created = DateTimeField(null=True)  # Allow null for new objects
+    date_updated = DateTimeField(null=True)  # Allow null for new objects
 
     def save(self, *args, **kwargs):
         """Saves the event's data with validation checks."""
+        self._validate_contract()
         self._validate_name()
         self._validate_event_date()
         self._validate_attendees()
         self._validate_team_contact()
-        self.date_updated = datetime.now()
+        if not self.id:
+            self.date_created = datetime.now()  # Auto date_created
+        self.date_updated = datetime.now()  # Auto date_updated
         super().save(*args, **kwargs)
+
+    def _validate_contract(self):
+        """Validates contract."""
+        if not self.contract or not Contract.get_or_none(Contract.id == self.contract.id):
+            raise ValueError("❌ Erreur : Vous devez assigner un contrat existant.")
 
     def _validate_name(self):
         """Validates the event name."""
         if not self.name:
-            raise ValueError("Erreur : Le nom de l'événement ne peut pas être vide.")
+            raise ValueError("❌ Erreur : Le nom de l'événement ne peut pas être vide.")
 
     def _validate_event_date(self):
         """Validates the event date."""
@@ -44,39 +52,37 @@ class Event(BaseModel):
             event_dt = self.event_date
         else:
             # Normalising date
-            print(f"DATE : {self.event_date}")
             self.event_date = self.event_date.strip()
-            if len(self.event_date) == 10:  # Format "YYYY-MM-DD"
-                self.event_date += " 12:00"  # Add default time
+            self.event_date = self.event_date.replace('_', ' ')
+            
+            # If the length is 10, it means the time part is missing, so add a default time
+            if len(self.event_date) == 10:
+                self.event_date += " 12:00"
 
             try:
                 event_dt = datetime.strptime(self.event_date, "%Y-%m-%d %H:%M")
             except ValueError:
-                raise ValueError("Erreur : Format de date invalide. Utilisez 'YYYY-MM-DD HH:MM'.")
-        
-        # Passed date
-        if event_dt < datetime.now():
-            raise ValueError("Erreur : La date de l'événement ne peut pas être dans le passé.")
+                raise ValueError("❌ Erreur : Format de date invalide. Utilisez 'YYYY-MM-DD' ou 'YYYY-MM-DD_HH:MM'.")
 
+        # Check if the date is in the past
+        if event_dt < datetime.now():
+            raise ValueError("❌ Erreur : La date de l'événement ne peut pas être dans le passé.")
+
+        # Save validated date
         self.event_date = event_dt
+
+        return event_dt
 
     def _validate_attendees(self):
         """Validates the number of attendees."""
         if self.attendees <= 0:
-            raise ValueError("Erreur : Le nombre d'invités doit être un nombre entier positif.")
-
-    def _validate_date(self):
-        """Validates the date."""
-        if isinstance(self.date_created, datetime):
-            return
-        else:
-            raise ValueError("Erreur : La date de création doit être au format datetime valide.")
+            raise ValueError("❌ Erreur : Le nombre d'invités doit être un nombre entier positif.")
 
     def _validate_team_contact(self):
         """Validates that team contact has a Support role."""
         try:
             if self.team_contact_id and self.team_contact_id.role.name.lower() != "support":
-                raise ValueError("Erreur : Vous devez assigner un utilisateur ayant le rôle de 'Support'.")
+                raise ValueError("❌ Erreur : Vous devez assigner un utilisateur ayant le rôle de 'Support'.")
         except DoesNotExist:
             self.team_contact_id = None
 

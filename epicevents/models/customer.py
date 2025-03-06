@@ -36,32 +36,32 @@ class Customer(BaseModel):
     def _validate_name(self):
         """Validates the first name and last name."""
         if not self.first_name.isalpha() or not self.last_name.isalpha():
-            raise ValueError("Erreur : Le prénom et le nom ne doivent contenir que des lettres.")
+            raise ValueError("❌ Erreur : Le prénom et le nom ne doivent contenir que des lettres.")
 
     def _validate_email(self):
         """Validates the email address."""
         pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
         if not re.match(pattern, self.email):
-            raise ValueError("Erreur : Veuillez entrer un email valide.")
+            raise ValueError("❌ Erreur : Veuillez entrer un email valide.")
 
     def _validate_phone(self):
         """Validates the phone number."""
         pattern = r"^\+?[0-9]{7,20}$"
         if not re.match(pattern, self.phone):
-            raise ValueError("Erreur : Veuillez entrer un numéro de téléphone valide.")
+            raise ValueError("❌ Erreur : Veuillez entrer un numéro de téléphone valide.")
 
     def _validate_date(self):
         """Validates date fields."""
         if isinstance(self.date_created, datetime):
             return
         else:
-            raise ValueError("Erreur : La date de création doit être au format datetime valide.")
+            raise ValueError("❌ Erreur : La date de création doit être au format datetime valide.")
 
     def _validate_team_contact(self):
         """Validates that team contact has a Sales role."""
         try:
             if self.team_contact_id and self.team_contact_id.role.name.lower() != "sales":
-                raise ValueError("Erreur : Vous devez assigner un utilisateur ayant le rôle de 'Commercial'.")
+                raise ValueError("❌ Erreur : Vous devez assigner un utilisateur ayant le rôle de 'Commercial'.")
         except DoesNotExist:
             self.team_contact_id = None
 

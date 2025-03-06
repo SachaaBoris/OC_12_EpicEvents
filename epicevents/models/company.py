@@ -5,7 +5,6 @@ from epicevents.models.database import BaseModel
 
 class Company(BaseModel):
     """Represents a company in the CRM system."""
-
     name = CharField(max_length=50, unique=True)
 
     def save(self, *args, **kwargs):
@@ -16,8 +15,9 @@ class Company(BaseModel):
     def _validate_name(self):
         """ Validates the name. """
         pattern = r"^[a-zA-ZÀ-ÿ0-9\s\.\,\-\_\&]+$"
-        
+
+        if not self.name:
+            raise ValueError("❌ Erreur : Le nom de société ne peut pas être vide.")
+
         if not re.match(pattern, self.name):
-            raise ValueError(
-                "Erreur : Un caractère n'est pas pris en charge."
-            )
+            raise ValueError("❌ Erreur : Un caractère n'est pas pris en charge.")

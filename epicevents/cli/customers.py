@@ -7,7 +7,6 @@ from peewee import DoesNotExist
 from epicevents.models.customer import Customer
 from epicevents.models.company import Company
 from epicevents.models.user import User
-from epicevents.cli.auth import is_logged
 from epicevents.cli.utils import display_list
 from epicevents.cli.utils import format_text
 
@@ -34,9 +33,19 @@ def create_customer(
 
     user = ctx.obj
 
-    # If "sales" & no contact_id given, auto-assign to user.id
-    if user.role.name == "sales" and contact_id == 0:
-        contact_id = user.id
+    # Checks contact_id
+    if contact_id:
+        try:
+            user = User.get_by_id(contact_id) # Checks if team contact exists
+        except DoesNotExist:
+            console.print(format_text('bold', 'red', f"❌ Erreur : L'utilisateur ID {contact_id} n'existe pas."))
+            raise typer.Exit()
+    else:
+        if user.role.name == "sales":
+            contact_id = user.id # Auto-assign to user.id
+        else:
+            console.print(format_text('bold', 'red', "❌ Erreur : Un contact doit être attribué au client."))
+            raise typer.Exit()
 
     # Checks if customer already exists
     if Customer.select().where(Customer.email == email).exists():
@@ -64,7 +73,7 @@ def create_customer(
         email=email,
         phone=phone,
         company_id=company_id,
-        assigned_user_id=contact_id
+        team_contact_id=contact_id
     )
 
     try:
@@ -101,18 +110,22 @@ def list_customers(
     """Lists all customers."""
     customers = Customer.select().join(Company, on=(Customer.company_id == Company.id))
     nobody_message = "❌ Aucun client n'est enregistré dans la bdd."
+    title_str = "Liste des clients"
 
     if filter_on:
         user = ctx.obj
         if user.role.name == "sales":
             customers = customers.where(Customer.team_contact_id == user.id)
             nobody_message = "❌ Aucun client ne vous est attribué."
+            title_str = title_str + " (Attribués)"
         elif user.role.name in ["admin", "management"]:
             customers = customers.where(Customer.team_contact_id.is_null(True))
             nobody_message = "❌ Aucun client sans agent n'est enregistré dans la bdd."
+            title_str = title_str + " (Sans agents attribués)"
         else:  # support
-            customers = customers.where(Customer.team_contact_id.is_null(False)) 
-            nobody_message = "❌ Aucun client avec agent n'est enregistré dans la bdd."         
+            customers = customers.where(Customer.team_contact_id.is_null(False))
+            nobody_message = "❌ Aucun client avec agent n'est enregistré dans la bdd."
+            title_str = title_str + " (Avec agents attribués)"            
 
     if not customers.exists():
         console.print(format_text('bold', 'red', f"{nobody_message}"))
@@ -143,7 +156,7 @@ def list_customers(
         )
 
     customers_list = sorted(customers_list, key=lambda x: x["ID"], reverse=False)
-    display_list("Liste des utilisateurs", customers_list, use_context=True)
+    display_list(title_str, customers_list, use_context=True)
 
 @app.command("update")
 def update_customer(

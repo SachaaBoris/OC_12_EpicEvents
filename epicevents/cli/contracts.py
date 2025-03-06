@@ -19,35 +19,44 @@ console = Console()
 
 @app.command("create")
 def create_contract(
+    ctx: typer.Context,
     customer_id: int = typer.Option(..., "-c", help="ID du client"),
     sum_total: float = typer.Option(..., "-st", help="Montant total"),
     sum_due: float = typer.Option(None, "-sd", help="Montant restant dû"),
     signed: bool = typer.Option(False, "-si", help="Statut de la signature (True: Signé, False: Non signé)"),
-    contact_id: int = typer.Option(0, "-u", help="ID du commercial en charge"),
+    contact_id: int = typer.Option(0, "-u", help="ID du gestionnaire en charge"),
 ):
     """Creates a new contract."""
+    
+    user = ctx.obj
+    
+    # Checks contact_id
+    if contact_id:
+        try:
+            user = User.get_by_id(contact_id) # Checks if team contact exists
+        except DoesNotExist:
+            console.print(format_text('bold', 'red', f"❌ Erreur : L'utilisateur ID {contact_id} n'existe pas."))
+            raise typer.Exit()
+    else:
+        if user.role.name == "management":
+            contact_id = user.id # Auto-assign to user.id
+        else:
+            console.print(format_text('bold', 'red', "❌ Erreur : Un contact doit être attribué au client."))
+            raise typer.Exit()
 
+    # Checks if customer exists
     try:
         customer = Customer.get_by_id(customer_id)
     except DoesNotExist:
         console.print(format_text('bold', 'red', f"❌ Erreur : Le client ID {customer_id} n'existe pas."))
         raise typer.Exit()
-
-    if contact_id:
-        try:
-            user = User.get_by_id(contact_id)
-        except DoesNotExist:
-            console.print(format_text('bold', 'red', f"❌ Erreur : L'utilisateur ID {contact_id} n'existe pas."))
-            raise typer.Exit()
-    else:
-        user = None
-
+    
     contract = Contract(
         customer=customer,
         amount_total=sum_total,
         amount_due=sum_due if sum_due is not None else sum_total,
         signed=signed,
-        team_contact=user,
+        team_contact=contact_id,
     )
     
     try:
@@ -66,13 +75,28 @@ def read_contract(
     if contract_id is not None:
         try:
             contract = Contract.get_by_id(contract_id)
+
+            # Get contract contact
+            team_contact = User.get_or_none(User.id == contract.team_contact_id)
+
+            # Get customer and customer contact
+            customer = contract.customer
+            customer_contact = "Aucun"
+            if customer and customer.team_contact_id:
+                user = User.get_or_none(User.id == customer.team_contact_id)
+                if user:
+                    customer_contact = f"{user.first_name} {user.last_name.upper()} ({user.id})"
+
+            contract = Contract.get_by_id(contract_id)
+            team_contact = User.get_or_none(User.id == contract.team_contact_id)
             contract_data = [
                 {"Champ": "ID", "Valeur": contract.id},
                 {"Champ": "Client", "Valeur": f"{contract.customer.first_name} {contract.customer.last_name.upper()}"},
                 {"Champ": "Montant total", "Valeur": f"{contract.amount_total:.2f} {CURRENCY}"},
                 {"Champ": "Montant dû", "Valeur": f"{contract.amount_due:.2f} {CURRENCY}"},
                 {"Champ": "Signé", "Valeur": "✅ Oui" if contract.signed else "❌ Non"},
-                {"Champ": "Epic Contact", "Valeur": f"{contract.team_contact.first_name} {contract.team_contact.last_name.upper()} ({contract.team_contact.user_id})" if contract.team_contact else "Aucun"},
+                {"Champ": "Epic Contact", "Valeur": f"{team_contact.first_name} {team_contact.last_name.upper()} ({team_contact.id})" if team_contact else "Aucun"},
+                {"Champ": "Contact du client", "Valeur": f" {customer_contact}"},
             ]
             display_list(f"Contrat {contract.id}", contract_data)
 
@@ -81,7 +105,6 @@ def read_contract(
             raise typer.Exit()
     else:
         console.print(format_text('bold', 'red', "❌ Erreur : Vous n'avez pas fourni d'ID de contrat."))
-
 
 @app.command("list")
 def list_contracts(
@@ -92,6 +115,7 @@ def list_contracts(
 
     contracts = Contract.select()
     nothing_message = "❌ Aucun contrat n'est enregistré dans la bdd."
+    title_str = "Liste des contrats"
 
     if filter_on:
         user = ctx.obj
@@ -99,12 +123,19 @@ def list_contracts(
         if user.role.name == "sales":
             contracts = contracts.where((Contract.signed == False) | (Contract.amount_due > 0))
             nothing_message = "❌ Aucun contrat 'problématique' dans la bdd."
-        elif user.role.name in ["admin", "management"]:
+            title_str = title_str + " (Non signés ou non réglés)"
+        elif user.role.name == "management":
+            contracts = contracts.where(Contract.team_contact_id.is_null(True))
+            nothing_message = "❌ Aucun contrat ne vous est attribué."
+            title_str = title_str + " (Attribués)"
+        elif user.role.name == "admin":
             contracts = contracts.where(Contract.team_contact_id.is_null(True))
             nothing_message = "❌ Aucun contrat sans agent dans la bdd."
+            title_str = title_str + " (Sans agents attribués)"
         else:  # support
             contracts = contracts.where(Contract.team_contact_id.is_null(False))
             nothing_message = "❌ Aucun contrat avec agent dans la bdd."
+            title_str = title_str + " (Avec agents attribués)"
 
     contracts = list(contracts)
     if not contracts:
@@ -138,7 +169,7 @@ def list_contracts(
         )
 
     contracts_list = sorted(contracts_list, key=lambda x: x["ID"], reverse=False)
-    display_list("Liste des contrats", contracts_list, use_context=True)
+    display_list(title_str, contracts_list, use_context=True)
 
 @app.command("update")
 def update_contract(

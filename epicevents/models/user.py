@@ -2,6 +2,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from peewee import *
 from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
 from epicevents.models.database import BaseModel
 from epicevents.models.role import Role
 
@@ -33,34 +34,35 @@ class User(BaseModel):
 
     def _validate_name(self):
         """Validates the first name and last name."""
-        if not self.first_name.isalpha() or not self.last_name.isalpha():
-            raise ValueError("Erreur : Le prénom et le nom ne doivent contenir que des lettres.")
+        pattern = r"^[a-zA-ZÀ-ÿ\-_\s]+$"
+        if not re.match(pattern, self.first_name) or not re.match(pattern, self.last_name):
+            raise ValueError("❌ Erreur : Le prénom et le nom ne doivent contenir que des lettres, tirets ou espaces.")
 
     def _validate_email(self):
         """Validates the email address."""
         pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
         if not re.match(pattern, self.email):
-            raise ValueError("Erreur : Veuillez entrer un email valide.")
+            raise ValueError("❌ Erreur : Veuillez entrer un email valide.")
 
     def _validate_phone(self):
         """Validates phone number."""
         pattern = r"^\+?[0-9]{7,15}$"
         if not re.match(pattern, self.phone):
-            raise ValueError("Erreur : Veuillez entrer un numéro de téléphone valide.")
+            raise ValueError("❌ Erreur : Veuillez entrer un numéro de téléphone valide.")
 
     def _validate_role(self):
         """Validates user role."""
         if not self.role:
-            raise ValueError("Erreur : L'utilisateur doit avoir un rôle assigné.")
+            raise ValueError("❌ Erreur : L'utilisateur doit avoir un rôle assigné.")
 
         if self.role.name.lower() not in ["admin", "management", "sales", "support"]:
-            raise ValueError("Erreur : Le rôle doit être 'admin' (1), 'management' (2), 'sales' (3) ou 'support' (4).")
+            raise ValueError("❌ Erreur : Le rôle doit être 'admin' (1), 'management' (2), 'sales' (3) ou 'support' (4).")
 
     def verify_password(self, password: str) -> bool:
         """Checks input password equals saved."""
         try:
             return ph.verify(self.password, password)
-        except exceptions.VerifyMismatchError:
+        except VerifyMismatchError:
             return False
 
     def get_data(self):

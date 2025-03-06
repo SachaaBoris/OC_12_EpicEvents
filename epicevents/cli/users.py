@@ -5,20 +5,21 @@ from rich.console import Console
 from rich.prompt import Confirm
 from peewee import DoesNotExist
 from dotenv import load_dotenv, set_key, get_key
+from argon2 import PasswordHasher
 from epicevents.models.user import User
 from epicevents.models.role import Role
-from epicevents.cli.auth import AuthenticationError
-from epicevents.cli.auth import authenticate_user
-from epicevents.cli.auth import generate_token
-from epicevents.cli.auth import verify_token
-from epicevents.cli.auth import remove_token
+from epicevents.permissions.auth import AuthenticationError
+from epicevents.permissions.auth import authenticate_user
+from epicevents.permissions.auth import generate_token
+from epicevents.permissions.auth import verify_token
+from epicevents.permissions.auth import remove_token
 from epicevents.cli.utils import display_list
 from epicevents.cli.utils import format_text
 
 
-
 app = typer.Typer(help="Gestion des utilisateurs")
 console = Console()
+ph = PasswordHasher()
 
 # AUTH operations
 @app.command("login")
@@ -94,10 +95,17 @@ def create_user(
         role=role,
     )
 
-    user.save()
-    console.print(
-        format_text('bold', 'green', f"✅ Utilisateur {user.username} créé avec succès !")
-    )
+    try:
+        user.save()
+        console.print(
+            format_text('bold', 'green', f"✅ Utilisateur {user.username} créé avec succès !")
+        )
+    except ValueError as e:
+        # Intercepte les erreurs de validation de la classe User
+        console.print(
+            format_text('bold', 'red', f"❌ {str(e)}")
+        )
+        raise typer.Exit(1)
 
 @app.command("read")
 def read_user(ctx: typer.Context, uid: int = typer.Argument(None, help="ID de l'utilisateur à afficher")):
@@ -135,10 +143,12 @@ def list_users(
     """Lists all users."""
 
     nobody_message = "❌ Aucun utilisateur n'est enregistré dans la bdd."
+    title_str = "Liste des utilisateurs"
 
     if filter_on:
         user = ctx.obj
         users = User.select().join(Role).where(Role.name == user.role.name)
+        title_str = title_str + f" ({user.role.name})"
     else:
         users = User.select()
 
@@ -161,7 +171,7 @@ def list_users(
         )
 
     users_list = sorted(users_list, key=lambda x: x["ID"], reverse=False)
-    display_list("Liste des utilisateurs", users_list, use_context=True)
+    display_list(title_str, users_list, use_context=True)
 
 @app.command("update")
 def update_user(

@@ -38,27 +38,27 @@ class Contract(BaseModel):
 
     def _validate_signed(self):
         if not self.signed:
-            raise IntegrityError("Erreur : Le Contrat doit être signé avant d'être sauvegardé.")
+            raise IntegrityError("❌ Erreur : Le Contrat doit être signé avant d'être sauvegardé.")
 
     def _validate_amounts(self):
         """Validates the total amount and amount due."""
         if self.amount_total < 0:
-            raise ValueError("Erreur : Le montant total ne peut pas être inférieur à zéro.")
+            raise ValueError("❌ Erreur : Le montant total ne peut pas être inférieur à zéro.")
         if self.amount_due and self.amount_due > self.amount_total:
-            raise ValueError("Erreur : Le montant dû ne peut pas être supérieur au montant total.")
+            raise ValueError("❌ Erreur : Le montant dû ne peut pas être supérieur au montant total.")
 
     def _validate_date(self):
         """Validates the date."""
         if isinstance(self.date_created, datetime):
             return
         else:
-            raise ValueError("Erreur : La date de création doit être au format datetime valide.")
+            raise ValueError("❌ Erreur : La date de création doit être au format datetime valide.")
 
     def _validate_team_contact(self):
         """Validates that team contact has a Management role."""
         try:
             if self.team_contact_id and self.team_contact_id.role.name.lower() != "management":
-                raise ValueError("Erreur : Vous devez assigner un utilisateur ayant le rôle de 'Gestionnaire'.")
+                raise ValueError("❌ Erreur : Vous devez assigner un utilisateur ayant le rôle de 'Gestionnaire'.")
         except DoesNotExist:
             self.team_contact_id = None
 

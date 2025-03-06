@@ -1,8 +1,8 @@
 import os
 import typer
-from epicevents.cli import auth, users, customers, contracts, events, utils
-from epicevents.cli.auth import check_auth
-
+from epicevents.cli import users, customers, contracts, events, utils
+from epicevents.permissions import auth
+from epicevents.permissions.auth import check_auth
 
 app = typer.Typer(
     add_completion=False,
@@ -17,5 +17,9 @@ app.add_typer(contracts.app, name="contract", help="Gestion des contrats", callb
 app.add_typer(events.app, name="event", help="Gestion des événements", callback=check_auth)
 app.add_typer(auth.app, name="util", help="Fonctions utilitaires", callback=check_auth)
 
-if __name__ == "__main__":
+def main():
+    """Point d'entrée principal de l'application"""
     app(obj={})
+
+if __name__ == "__main__":
+    main()
