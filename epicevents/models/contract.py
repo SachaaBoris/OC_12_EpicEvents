@@ -1,6 +1,12 @@
-import re
-from datetime import datetime, timedelta, timezone
-from peewee import *
+from datetime import datetime
+from peewee import (
+    BooleanField,
+    FloatField,
+    DateTimeField,
+    ForeignKeyField,
+    DoesNotExist,
+    IntegrityError
+)
 from epicevents.models.database import BaseModel
 from epicevents.models.customer import Customer
 from epicevents.models.user import User

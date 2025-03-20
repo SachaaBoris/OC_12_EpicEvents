@@ -1,5 +1,5 @@
 import re
-from peewee import *
+from peewee import CharField
 from epicevents.models.database import BaseModel
 
 

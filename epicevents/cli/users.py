@@ -1,16 +1,12 @@
 import typer
-import os
-from datetime import datetime
 from rich.console import Console
 from rich.prompt import Confirm
 from peewee import DoesNotExist
-from dotenv import load_dotenv, set_key, get_key
 from argon2 import PasswordHasher
 from epicevents.models.user import User
 from epicevents.models.role import Role
 from epicevents.permissions.auth import AuthenticationError
 from epicevents.permissions.auth import authenticate_user
-from epicevents.permissions.auth import generate_token
 from epicevents.permissions.auth import verify_token
 from epicevents.permissions.auth import remove_token
 from epicevents.cli.utils import display_list
@@ -20,6 +16,7 @@ from epicevents.cli.utils import format_text
 app = typer.Typer(help="Gestion des utilisateurs")
 console = Console()
 ph = PasswordHasher()
+
 
 # AUTH operations
 @app.command("login")
@@ -40,6 +37,7 @@ def login(
         )
         raise typer.Exit(1)
 
+
 @app.command("logout")
 def logout():
     """Logs out current user through CLI"""
@@ -55,6 +53,7 @@ def logout():
         console.print(
             format_text('bold', 'red', "❌ Vous n'étiez pas connecté.")
         )
+
 
 # CRUD operations
 @app.command("create")
@@ -72,7 +71,7 @@ def create_user(
     # Check if user already exists
     if User.select().where((User.username == username) | (User.email == email)).exists():
         console.print(
-            format_text('bold', 'red', "❌ Erreur : email déjà utilisé.")
+            format_text('bold', 'red', "❌ Erreur : User déjà enregistré.")
         )
         raise typer.Exit()
 
@@ -107,6 +106,7 @@ def create_user(
         )
         raise typer.Exit(1)
 
+
 @app.command("read")
 def read_user(ctx: typer.Context, uid: int = typer.Argument(None, help="ID de l'utilisateur à afficher")):
     """Shows user details given user uid."""
@@ -132,8 +132,9 @@ def read_user(ctx: typer.Context, uid: int = typer.Argument(None, help="ID de l'
             raise typer.Exit()
     else:
         console.print(
-            format_text('bold', 'red', f"❌ Erreur : Vous n'avez pas fourni d'ID utilisateur.")
+            format_text('bold', 'red', "❌ Erreur : Vous n'avez pas fourni d'ID utilisateur.")
         )
+
 
 @app.command("list")
 def list_users(
@@ -162,16 +163,17 @@ def list_users(
 
         users_list.append(
             {
-            "ID": user.id,
-            "USERNAME": user.username,
-            "EMAIL": user.email,
-            "ROLE": user.role.name if user.role else "Aucun",
-            "Contexte": context_color,
+                "ID": user.id,
+                "USERNAME": user.username,
+                "EMAIL": user.email,
+                "ROLE": user.role.name if user.role else "Aucun",
+                "Contexte": context_color,
             }
         )
 
     users_list = sorted(users_list, key=lambda x: x["ID"], reverse=False)
     display_list(title_str, users_list, use_context=True)
+
 
 @app.command("update")
 def update_user(
@@ -211,7 +213,7 @@ def update_user(
         updates["phone"] = phone
     if role_id is not None:
         updates["role"] = role_id
-    
+
     try:
         if updates:
             for key, value in updates.items():
@@ -222,12 +224,13 @@ def update_user(
             )
         else:
             console.print(
-                format_text('bold', 'yellow', "⚠ Aucun champ à mettre à jour.")
+                format_text('bold', 'yellow', "⚠  Aucun champ à mettre à jour.")
             )
             raise typer.Exit()
     except ValueError as e:
-        console.print(format_text('bold', 'red', f"❌ {str(e)}"))
+        console.print(format_text('bold', 'red', f"{str(e)}"))
         raise typer.Exit(1)
+
 
 @app.command("delete")
 def delete_user(

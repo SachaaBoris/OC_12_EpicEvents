@@ -1,6 +1,5 @@
 import re
-from datetime import datetime, timedelta, timezone
-from peewee import *
+from peewee import CharField, ForeignKeyField
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from epicevents.models.database import BaseModel
@@ -8,6 +7,7 @@ from epicevents.models.role import Role
 
 
 ph = PasswordHasher()
+
 
 class User(BaseModel):
     """Represents a user in the CRM system."""
@@ -40,8 +40,14 @@ class User(BaseModel):
 
     def _validate_email(self):
         """Validates the email address."""
-        pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+        if not self.email or len(self.email) < 5:  # smallest mail in the universe
+            raise ValueError("❌ Erreur : Veuillez entrer un email valide.")
+
+        pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         if not re.match(pattern, self.email):
+            raise ValueError("❌ Erreur : Veuillez entrer un email valide.")
+
+        if ".." in self.email or self.email.count("@") != 1:
             raise ValueError("❌ Erreur : Veuillez entrer un email valide.")
 
     def _validate_phone(self):
@@ -70,8 +76,7 @@ class User(BaseModel):
         user_data = {
             "user_id": self.id,
             "email": self.email,
-            "role_id": self.role.id if self.role else None,
-            "jwt_exp": datetime.now(tz=timezone.utc) + timedelta(hours=1),
+            "role_id": self.role.id if self.role else None
         }
 
         return user_data

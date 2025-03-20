@@ -3,8 +3,6 @@ from datetime import datetime, timedelta
 from epicevents.models.database import psql_db
 from epicevents.models.role import Role
 from epicevents.models.user import User
-#from epicevents.models.permission import Permission
-#from epicevents.models.rolepermission import RolePermission
 from epicevents.models.company import Company
 from epicevents.models.customer import Customer
 from epicevents.models.contract import Contract
@@ -14,6 +12,7 @@ from epicevents.models.event import Event
 ADMIN_EMAIL = get_key(".env", "ADMIN_EMAIL")
 ADMIN_PASSWORD = get_key(".env", "ADMIN_PASSWORD")
 
+
 def postgre_connect():
     """Connecting to the database."""
     try:
@@ -22,6 +21,7 @@ def postgre_connect():
     except Exception as e:
         print(f"❌ Failed to connect to the database: {e}")
         exit(1)
+
 
 def create_users():
     """Creates a user per role."""
@@ -49,6 +49,7 @@ def create_users():
         except Exception as e:
             print(f"❌ Failed to create {role} user: {e}")
 
+
 def create_customers():
     """Creates 2 customers."""
     test_customers = [
@@ -70,6 +71,7 @@ def create_customers():
         except Exception as e:
             print(f"❌ Failed to create customer {first_name} {last_name}: {e}")
 
+
 def create_contracts():
     """Creates 2 contracts."""
     test_contracts = [
@@ -89,14 +91,15 @@ def create_contracts():
         except Exception as e:
             print(f"❌ Failed to create contract for customer {customer_id}: {e}")
 
+
 def create_events():
     """Creates 2 events."""
     current_time = datetime.now()
     test_events = [
-        (1, "Conférence annuelle", "26 Waterloo Rd, SE1 8TY, London, UK", 
+        (1, "Conférence annuelle", "26 Waterloo Rd, SE1 8TY, London, UK",
          (current_time + timedelta(days=180)).strftime("%Y-%m-%d %H:%M:%S"),
          150, "Penser aux croissants.", 4),
-        (2, "Blast from the Past", "3 place de l'église, 93100 Montreuil, FR", 
+        (2, "Blast from the Past", "3 place de l'église, 93100 Montreuil, FR",
          (current_time + timedelta(minutes=2)).strftime("%Y-%m-%d %H:%M:%S"),
          50, "Prévoir un accès PMR.", 4)
     ]
@@ -115,6 +118,7 @@ def create_events():
         except Exception as e:
             print(f"❌ Failed to create event {name}: {e}")
 
+
 def close_db():
     """Closes db connection."""
     try:
@@ -123,6 +127,7 @@ def close_db():
     except Exception as e:
         print(f"❌ Failed to close the database connection: {e}")
 
+
 def create_test_data():
     postgre_connect()
     create_users()
@@ -130,6 +135,7 @@ def create_test_data():
     create_contracts()
     create_events()
     close_db()
+
 
 if __name__ == "__main__":
     create_test_data()

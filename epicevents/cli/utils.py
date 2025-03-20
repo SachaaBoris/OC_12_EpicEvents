@@ -1,16 +1,15 @@
+import time
+import keyboard
 from rich.color import ANSI_COLOR_NAMES
 from rich import print
 from rich.console import Console
 from rich.table import Table
-import time
-import keyboard
-from dotenv import load_dotenv, get_key
+from epicevents.config import ITEMS_PER_PAGE
 
 
-load_dotenv()
 console = Console()
-ITEMS_PP = int(get_key(".env", "ITEMS_PER_PAGE"))
 VALID_RICH_COLORS = list(ANSI_COLOR_NAMES.keys())
+
 
 def validate_rich_color(color=None):
     """Returns a rich valid color anyways"""
@@ -19,22 +18,23 @@ def validate_rich_color(color=None):
         return "white"
     return color
 
+
 def display_list(title: str, items: list, use_context: bool = False):
     """Displays a list of records with pagination."""
 
     # See https://rich.readthedocs.io/en/stable/protocol.html?highlight=__rich__#console-customization
 
-    items_per_page = ITEMS_PP
+    items_per_page = ITEMS_PER_PAGE
     total_items = len(items)
     total_pages = (total_items + items_per_page - 1) // items_per_page
-    current_page = 1 
+    current_page = 1
 
     while current_page <= total_pages:
         start_index = (current_page - 1) * items_per_page
         end_index = min(start_index + items_per_page, total_items)
         page_items = items[start_index:end_index]
         title_str = title if total_pages <= 1 else f"{title} (Page {current_page}/{total_pages})"
-        
+
         table = Table(
             title=title_str,
             padding=(0, 1),
@@ -80,6 +80,7 @@ def display_list(title: str, items: list, use_context: bool = False):
         else:
             current_page += 1
 
+
 def format_text(style: str, color: str, text: str) -> None:
     """
     Formats text with a Rich style and color.
@@ -116,6 +117,7 @@ def format_text(style: str, color: str, text: str) -> None:
 
     style_tag = style_map[style]
     return f"[{style_tag} {color}]{text}[/{style_tag} {color}]"
+
 
 def welcome_user():
     """Logo display when logging-in."""

@@ -1,13 +1,10 @@
 import typer
-import os
-from datetime import datetime
 from rich.console import Console
 from rich.prompt import Confirm
 from peewee import DoesNotExist
 from peewee import IntegrityError
 from epicevents.models.contract import Contract
 from epicevents.models.customer import Customer
-from epicevents.models.company import Company
 from epicevents.models.user import User
 from epicevents.cli.utils import display_list, format_text
 from dotenv import get_key
@@ -16,6 +13,7 @@ from dotenv import get_key
 app = typer.Typer(help="Gestion des contrats")
 CURRENCY = get_key(".env", "CURRENCY")
 console = Console()
+
 
 @app.command("create")
 def create_contract(
@@ -27,19 +25,19 @@ def create_contract(
     contact_id: int = typer.Option(0, "-u", help="ID du gestionnaire en charge"),
 ):
     """Creates a new contract."""
-    
+
     user = ctx.obj
-    
+
     # Checks contact_id
     if contact_id:
         try:
-            user = User.get_by_id(contact_id) # Checks if team contact exists
+            user = User.get_by_id(contact_id)  # Checks if team contact exists
         except DoesNotExist:
             console.print(format_text('bold', 'red', f"❌ Erreur : L'utilisateur ID {contact_id} n'existe pas."))
             raise typer.Exit()
     else:
         if user.role.name == "management":
-            contact_id = user.id # Auto-assign to user.id
+            contact_id = user.id  # Auto-assign to user.id
         else:
             console.print(format_text('bold', 'red', "❌ Erreur : Un contact doit être attribué au client."))
             raise typer.Exit()
@@ -50,7 +48,7 @@ def create_contract(
     except DoesNotExist:
         console.print(format_text('bold', 'red', f"❌ Erreur : Le client ID {customer_id} n'existe pas."))
         raise typer.Exit()
-    
+
     contract = Contract(
         customer=customer,
         amount_total=sum_total,
@@ -58,13 +56,19 @@ def create_contract(
         signed=signed,
         team_contact=contact_id,
     )
-    
+
     try:
         contract.save()
-        console.print(format_text('bold', 'green', f"✅ Contrat {contract.id} créé pour {customer.first_name} {customer.last_name}."))
+        console.print(
+            format_text(
+                'bold', 'green',
+                f"✅ Contrat {contract.id} créé pour {customer.first_name} {customer.last_name}."
+            )
+        )
     except (ValueError, IntegrityError) as e:
-        console.print(format_text('bold', 'red', f"❌ {str(e)}"))
+        console.print(format_text('bold', 'red', f"{str(e)}"))
         raise typer.Exit(1)
+
 
 @app.command("read")
 def read_contract(
@@ -95,7 +99,14 @@ def read_contract(
                 {"Champ": "Montant total", "Valeur": f"{contract.amount_total:.2f} {CURRENCY}"},
                 {"Champ": "Montant dû", "Valeur": f"{contract.amount_due:.2f} {CURRENCY}"},
                 {"Champ": "Signé", "Valeur": "✅ Oui" if contract.signed else "❌ Non"},
-                {"Champ": "Epic Contact", "Valeur": f"{team_contact.first_name} {team_contact.last_name.upper()} ({team_contact.id})" if team_contact else "Aucun"},
+                {
+                    "Champ": "Epic Contact",
+                    "Valeur": (
+                        f"{team_contact.first_name} {team_contact.last_name.upper()} ({team_contact.id})"
+                        if team_contact
+                        else "Aucun"
+                    )
+                },
                 {"Champ": "Contact du client", "Valeur": f" {customer_contact}"},
             ]
             display_list(f"Contrat {contract.id}", contract_data)
@@ -105,6 +116,7 @@ def read_contract(
             raise typer.Exit()
     else:
         console.print(format_text('bold', 'red', "❌ Erreur : Vous n'avez pas fourni d'ID de contrat."))
+
 
 @app.command("list")
 def list_contracts(
@@ -119,9 +131,9 @@ def list_contracts(
 
     if filter_on:
         user = ctx.obj
-        
+
         if user.role.name == "sales":
-            contracts = contracts.where((Contract.signed == False) | (Contract.amount_due > 0))
+            contracts = contracts.where((not Contract.signed) | (Contract.amount_due > 0))
             nothing_message = "❌ Aucun contrat 'problématique' dans la bdd."
             title_str = title_str + " (Non signés ou non réglés)"
         elif user.role.name == "management":
@@ -163,13 +175,19 @@ def list_contracts(
                 "CLIENT": f"{contract.customer.first_name} {contract.customer.last_name.upper()} ({contract.customer.id})",
                 "MONTANT TOTAL": f"{contract.amount_total:.2f} {CURRENCY}",
                 "MONTANT DÛ": f"{contract.amount_due:.2f} {CURRENCY}",
-                "EPIC CONTACT": f"{contract.team_contact_id.first_name} {contract.team_contact_id.last_name.upper()} ({contract.team_contact_id.id})" if contract.team_contact_id else "Aucun",
+                "EPIC CONTACT": (
+                    f"{contract.team_contact_id.first_name} {contract.team_contact_id.last_name.upper()} "
+                    f"({contract.team_contact_id.id})"
+                    if contract.team_contact_id
+                    else "Aucun"
+                ),
                 "Contexte": context,
             }
         )
 
     contracts_list = sorted(contracts_list, key=lambda x: x["ID"], reverse=False)
     display_list(title_str, contracts_list, use_context=True)
+
 
 @app.command("update")
 def update_contract(
@@ -216,11 +234,12 @@ def update_contract(
             contract.save()
             console.print(format_text('bold', 'green', f"✅ Contrat {contract_id} mis à jour avec succès !"))
         else:
-            console.print(format_text('bold', 'yellow', "⚠ Aucun champ à mettre à jour."))
+            console.print(format_text('bold', 'yellow', "⚠  Aucun champ à mettre à jour."))
             raise typer.Exit()
     except (ValueError, IntegrityError) as e:
-        console.print(format_text('bold', 'red', f"❌ {str(e)}"))
+        console.print(format_text('bold', 'red', f"{str(e)}"))
         raise typer.Exit(1)
+
 
 @app.command("delete")
 def delete_contract(

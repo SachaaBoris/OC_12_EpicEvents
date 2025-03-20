@@ -1,6 +1,4 @@
 import typer
-import os
-from datetime import datetime
 from rich.console import Console
 from rich.prompt import Confirm
 from peewee import DoesNotExist
@@ -14,10 +12,12 @@ from epicevents.cli.utils import format_text
 app = typer.Typer(help="Gestion des clients")
 console = Console()
 
+
 def create_company(company_name: str) -> int:
     """Checks if company already exists."""
     company, created = Company.get_or_create(name=company_name)
     return company.id
+
 
 @app.command("create")
 def create_customer(
@@ -36,13 +36,13 @@ def create_customer(
     # Checks contact_id
     if contact_id:
         try:
-            user = User.get_by_id(contact_id) # Checks if team contact exists
+            user = User.get_by_id(contact_id)  # Checks if team contact exists
         except DoesNotExist:
             console.print(format_text('bold', 'red', f"❌ Erreur : L'utilisateur ID {contact_id} n'existe pas."))
             raise typer.Exit()
     else:
         if user.role.name == "sales":
-            contact_id = user.id # Auto-assign to user.id
+            contact_id = user.id  # Auto-assign to user.id
         else:
             console.print(format_text('bold', 'red', "❌ Erreur : Un contact doit être attribué au client."))
             raise typer.Exit()
@@ -79,11 +79,15 @@ def create_customer(
     try:
         customer.save()
         console.print(
-            format_text('bold', 'green', f"✅ Client {customer.id} : {customer.first_name} {customer.last_name.upper()} créé avec succès.")
+            format_text(
+                'bold', 'green',
+                f"✅ Client {customer.id} : {customer.first_name} {customer.last_name.upper()} créé avec succès."
+            )
         )
     except ValueError as e:
         console.print(format_text('bold', 'red', f"❌ {str(e)}"))
         raise typer.Exit(1)
+
 
 @app.command("read")
 def read_customer(customer_id: int = typer.Argument(None, help="ID du client à afficher")):
@@ -95,12 +99,23 @@ def read_customer(customer_id: int = typer.Argument(None, help="ID du client à 
             {"Champ": "Email", "Valeur": customer.email},
             {"Champ": "Téléphone", "Valeur": customer.phone},
             {"Champ": "Entreprise", "Valeur": customer.company.name},
-            {"Champ": "Epic Contact", "Valeur": f"{customer.team_contact_id.first_name} {customer.team_contact_id.last_name.upper()} ({customer.team_contact_id.id})" if isinstance(customer.team_contact_id, User) else f"ID: {customer.team_contact_id}" if customer.team_contact_id else "Aucun"},
+            {
+                "Champ": "Epic Contact",
+                "Valeur": (
+                    f"{customer.team_contact_id.first_name} {customer.team_contact_id.last_name.upper()} "
+                    f"({customer.team_contact_id.id})"
+                    if isinstance(customer.team_contact_id, User)
+                    else f"ID: {customer.team_contact_id}"
+                    if customer.team_contact_id
+                    else "Aucun"
+                )
+            }
         ]
         display_list(f"Client {customer.first_name} {customer.last_name.upper()}", customer_data)
     except DoesNotExist:
         console.print(format_text('bold', 'red', f"❌ Client ID {customer_id} introuvable."))
         raise typer.Exit()
+
 
 @app.command("list")
 def list_customers(
@@ -125,7 +140,7 @@ def list_customers(
         else:  # support
             customers = customers.where(Customer.team_contact_id.is_null(False))
             nobody_message = "❌ Aucun client avec agent n'est enregistré dans la bdd."
-            title_str = title_str + " (Avec agents attribués)"            
+            title_str = title_str + " (Avec agents attribués)"
 
     if not customers.exists():
         console.print(format_text('bold', 'red', f"{nobody_message}"))
@@ -137,11 +152,14 @@ def list_customers(
         context_color = "red"
 
         if isinstance(customer.team_contact_id, User):
-            contact_info = f"{customer.team_contact_id.first_name} {customer.team_contact_id.last_name.upper()} ({customer.team_contact_id.id})"
+            contact_info = (
+                f"{customer.team_contact_id.first_name} {customer.team_contact_id.last_name.upper()} "
+                f"({customer.team_contact_id.id})"
+            )
             context_color = "white"
         elif customer.team_contact_id:
-             contact_info = f"ID: {customer.team_contact_id}"
-             context_color = "orange"
+            contact_info = f"ID: {customer.team_contact_id}"
+            context_color = "orange"
 
         customers_list.append(
             {
@@ -157,6 +175,7 @@ def list_customers(
 
     customers_list = sorted(customers_list, key=lambda x: x["ID"], reverse=False)
     display_list(title_str, customers_list, use_context=True)
+
 
 @app.command("update")
 def update_customer(
@@ -189,19 +208,25 @@ def update_customer(
         updates["company_id"] = create_company(company)
     if user_id is not None:
         updates["team_contact_id"] = user_id
-    
+
     try:
         if updates:
             for key, value in updates.items():
                 setattr(customer, key, value)
             customer.save()
-            console.print(format_text('bold', 'green', f"✅ Client {customer_id} : {customer.first_name} {customer.last_name.upper()} mis à jour avec succès !"))
+            console.print(
+                format_text(
+                    'bold', 'green',
+                    f"✅ Client {customer_id} : {customer.first_name} {customer.last_name.upper()} mis à jour avec succès !"
+                )
+            )
         else:
-            console.print(format_text('bold', 'yellow', "⚠ Aucun champ à mettre à jour."))
+            console.print(format_text('bold', 'yellow', "⚠  Aucun champ à mettre à jour."))
             raise typer.Exit()
     except ValueError as e:
-        console.print(format_text('bold', 'red', f"❌ {str(e)}"))
+        console.print(format_text('bold', 'red', f"{str(e)}"))
         raise typer.Exit(1)
+
 
 @app.command("delete")
 def delete_customer(
@@ -215,12 +240,20 @@ def delete_customer(
         raise typer.Exit()
 
     confirm = Confirm.ask(
-        format_text('bold', 'yellow', f"⚠ Êtes-vous sûr de vouloir supprimer {customer.first_name} {customer.last_name.upper()} ({customer_id}) ?")
+        format_text(
+            'bold', 'yellow',
+            f"⚠ Êtes-vous sûr de vouloir supprimer {customer.first_name} {customer.last_name.upper()} ({customer_id}) ?"
+        )
     )
 
     if confirm:
         customer.delete_instance()
-        console.print(format_text('bold', 'green', f"✅ Client {customer.first_name} {customer.last_name.upper()} ({customer_id}) supprimé !"))
+        console.print(
+            format_text(
+                'bold', 'green',
+                f"✅ Client {customer.first_name} {customer.last_name.upper()} ({customer_id}) supprimé !"
+            )
+        )
     else:
         console.print(
             format_text('bold', 'red', "❌ Opération annulée.")

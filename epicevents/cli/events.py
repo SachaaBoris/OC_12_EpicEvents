@@ -1,13 +1,10 @@
 import typer
-import os
 from datetime import datetime
 from rich.console import Console
 from rich.prompt import Confirm
 from peewee import DoesNotExist
 from typing import Optional
 from epicevents.models.event import Event
-from epicevents.models.contract import Contract
-from epicevents.models.customer import Customer
 from epicevents.models.user import User
 from epicevents.cli.utils import display_list
 from epicevents.cli.utils import format_text
@@ -15,6 +12,7 @@ from epicevents.cli.utils import format_text
 
 app = typer.Typer(help="Gestion des événements")
 console = Console()
+
 
 @app.command("create")
 def create_event(
@@ -30,7 +28,7 @@ def create_event(
 
     event = Event(
         contract_id=contract_id,
-        name = event_name,
+        name=event_name,
         event_date=event_date,
         location=place,
         attendees=attendees,
@@ -45,15 +43,13 @@ def create_event(
         console.print(format_text('bold', 'red', f"❌ {str(e)}"))
         raise typer.Exit(1)
 
+
 @app.command("read")
 def read_event(event_id: int = typer.Argument(..., help="ID de l'événement à afficher")):
     """Shows a specific event."""
 
     try:
         event = Event.get_by_id(event_id)
-
-        # Handle relationship for event contact
-        event_contact = f"{event.team_contact_id.first_name} {event.team_contact_id.last_name.upper()} ({event.team_contact_id.id})" if isinstance(event.team_contact_id, User) else f"ID: {event.team_contact_id}" if event.team_contact_id else "Aucun"
 
         # Access contract
         contract = event.contract
@@ -84,7 +80,17 @@ def read_event(event_id: int = typer.Argument(..., help="ID de l'événement à 
             {"Champ": "Localisation", "Valeur": event.location},
             {"Champ": "Participants", "Valeur": event.attendees},
             {"Champ": "Notes", "Valeur": event.notes},
-            {"Champ": "Contact Epic", "Valeur": f"{event.team_contact_id.first_name} {event.team_contact_id.last_name.upper()} ({event.team_contact_id.id})" if isinstance(event.team_contact_id, User) else f"ID: {event.team_contact_id}" if event.team_contact_id else "Aucun"},
+            {
+                "Champ": "Contact Epic",
+                "Valeur": (
+                    f"{event.team_contact_id.first_name} {event.team_contact_id.last_name.upper()} "
+                    f"({event.team_contact_id.id})"
+                    if isinstance(event.team_contact_id, User)
+                    else f"ID: {event.team_contact_id}"
+                    if event.team_contact_id
+                    else "Aucun"
+                )
+            },
             {"Champ": "Contrat ID", "Valeur": f" {contract_id}"},
             {"Champ": "Contact du contrat", "Valeur": f" {contract_contact}"},
             {"Champ": "Customer ID", "Valeur": f" {customer_id}"},
@@ -94,6 +100,7 @@ def read_event(event_id: int = typer.Argument(..., help="ID de l'événement à 
     except DoesNotExist:
         console.print(format_text('bold', 'red', f"❌ L'événement {event_id} n'existe pas."))
         raise typer.Exit()
+
 
 @app.command("list")
 def list_events(
@@ -166,8 +173,10 @@ def list_events(
     event_list = sorted(event_list, key=lambda x: x["ID"], reverse=False)
     display_list(title_str, event_list, use_context=True)
 
+
 @app.command("update")
 def update_event(
+    ctx: typer.Context,
     event_id: int = typer.Argument(..., help="ID de l'évennement à modifier"),
     contract_id: int = typer.Option(None, "-ct", help="Numéro du contrat associé"),
     event_name: str = typer.Option(None, "-t", help="Nom de l'événement"),
@@ -179,6 +188,8 @@ def update_event(
 ):
     """Updates an existing event."""
 
+    user = ctx.obj
+
     try:
         event = Event.get_by_id(event_id)
     except DoesNotExist:
@@ -186,21 +197,26 @@ def update_event(
         raise typer.Exit()
 
     updates = {}
-    
-    if contract_id:
-        updates["contract_id"] = contract_id
-    if event_name:
-        updates["name"] = event_name
-    if event_date:
-        updates["event_date"] = datetime.strptime(event_date, "%Y-%m-%d")
-    if place:
-        updates["location"] = place
-    if attendees:
-        updates["attendees"] = attendees
-    if notes:
-        updates["notes"] = notes
-    if contact_id:
-        updates["team_contact_id"] = contact_id
+
+    print(f"DEBUG : {user.role.name}")
+    if user.role.name == "management":
+        if contact_id:
+            updates["team_contact_id"] = contact_id
+    else:
+        if contract_id:
+            updates["contract_id"] = contract_id
+        if event_name:
+            updates["name"] = event_name
+        if event_date:
+            updates["event_date"] = datetime.strptime(event_date, "%Y-%m-%d")
+        if place:
+            updates["location"] = place
+        if attendees:
+            updates["attendees"] = attendees
+        if notes:
+            updates["notes"] = notes
+        if contact_id:
+            updates["team_contact_id"] = contact_id
 
     try:
         if updates:
@@ -209,12 +225,13 @@ def update_event(
             event.save()
             console.print(format_text('bold', 'green', f"✅ Événement {event_id} mis à jour avec succès !"))
         else:
-            console.print(format_text('bold', 'yellow', "⚠ Aucun champ à mettre à jour."))
+            console.print(format_text('bold', 'yellow', "⚠  Aucun champ à mettre à jour."))
             raise typer.Exit()
 
     except ValueError as e:
-        console.print(format_text('bold', 'red', f"❌ {str(e)}"))
+        console.print(format_text('bold', 'red', f"{str(e)}"))
         raise typer.Exit(1)
+
 
 @app.command("delete")
 def delete_event(
@@ -238,4 +255,3 @@ def delete_event(
     else:
         console.print(format_text('bold', 'red', "❌ Opération annulée."))
         raise typer.Exit()
-    

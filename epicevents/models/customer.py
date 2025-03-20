@@ -1,6 +1,11 @@
 import re
-from datetime import datetime, timedelta, timezone
-from peewee import *
+from datetime import datetime
+from peewee import (
+    CharField,
+    DateTimeField,
+    ForeignKeyField,
+    DoesNotExist
+)
 from epicevents.models.database import BaseModel
 from epicevents.models.company import Company
 from epicevents.models.user import User
@@ -40,8 +45,14 @@ class Customer(BaseModel):
 
     def _validate_email(self):
         """Validates the email address."""
-        pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+        if not self.email or len(self.email) < 5:  # smallest mail in the universe
+            raise ValueError("❌ Erreur : Veuillez entrer un email valide.")
+
+        pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         if not re.match(pattern, self.email):
+            raise ValueError("❌ Erreur : Veuillez entrer un email valide.")
+
+        if ".." in self.email or self.email.count("@") != 1:
             raise ValueError("❌ Erreur : Veuillez entrer un email valide.")
 
     def _validate_phone(self):

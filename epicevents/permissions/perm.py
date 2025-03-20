@@ -10,57 +10,95 @@ def always_true(*args) -> bool:
     """Default permission function that always returns True."""
     return True
 
-def is_self(user, target_user):
-    """Checks if target user is the same as the requesting user."""
-    return user.id == target_user.id
 
-def is_owner(user, entity):
+def is_self(user, target_user, resource):
+    """Checks if target user is the same as the requesting user."""
+
+    if isinstance(target_user, int):
+        # Target is an id
+        return user.id == target_user
+
+    elif hasattr(target_user, 'id'):
+        # Target is an object
+        return user.id == target_user.id
+
+
+def is_owner(user, entity_or_id, resource):
     """Checks if user is the owner of the entity."""
-    if hasattr(entity, 'team_contact_id'):
-        return entity.team_contact_id == user.id
+
+    try:
+        if resource not in ['customer', 'contract', 'event']:
+            return False
+
+        # Si on nous a passé un ID, on récupère l'entité
+        if isinstance(entity_or_id, (int, str)):
+            try:
+                if resource == 'customer':
+                    entity = Customer.get_by_id(entity_or_id)
+                elif resource == 'contract':
+                    entity = Contract.get_by_id(entity_or_id)
+                elif resource == 'event':
+                    entity = Event.get_by_id(entity_or_id)
+                else:
+                    return False
+            except DoesNotExist:
+                return False
+        else:
+            # Si on nous a passé l'entité directement
+            entity = entity_or_id
+
+        # Vérification du propriétaire
+        if hasattr(entity, 'team_contact_id'):
+            if hasattr(user, 'id'):
+                return entity.team_contact_id == user.id
+            else:
+                return entity.team_contact_id == user
+
+    except Exception:
+        return False
+
     return False
 
-def is_my_customer(user, event_id):
+
+def is_my_customer(user, target_id, resource):
     """
     Checks if a user owns the customer linked to an event through its contract.
-    
+
     Args:
-        user: The user attempting to perform the action
-        event_id: The ID of the event
-    
+        user: The user ID attempting to perform the action
+        target_id: The ID of the event
+
     Returns:
         tuple: (success, error_message) where success is a boolean and error_message is None or a string
     """
-    from epicevents.models.contract import Contract
-    from epicevents.models.event import Event
-    from peewee import DoesNotExist
-    
+
     try:
-        # Get the Event from database using the ID
-        event = Event.get_by_id(event_id)
-        
-        # Ensure the event has a contract
-        if not hasattr(event, 'contract'):
-            return False, "L'événement n'a pas de contrat associé."
-            
-        if not event.contract:
-            return False, "L'événement n'a pas de contrat associé."
-        
-        # Get the contract
-        contract = Contract.get_by_id(event.contract.id)
-        
+        contract = None
+
+        try:
+            event = Event.get_by_id(target_id)
+            # First ensure the event has a contract
+            if not hasattr(event, 'contract') or not event.contract:
+                return False, "L'événement n'a pas de contrat associé."
+
+            # Get the contract
+            contract = Contract.get_by_id(event.contract.id)
+        except DoesNotExist:
+            try:
+                # Maybe a contract ID
+                contract = Contract.get_by_id(target_id)
+            except DoesNotExist:
+                return False, f"Ni l'événement ni le contrat avec l'ID {target_id} n'existe."
+
         if contract:
             # Ensure the contract is signed
             if not contract.signed:
                 return False, "Le contrat n'est pas encore signé."
-            
+
             # Check if user is the contact for the customer
             if contract.customer_id:
-                result = Customer.select().where(
-                    (Customer.id == contract.customer_id) & 
-                    (Customer.team_contact_id == user.id)
-                ).exists()
-                
+                condition = (Customer.id == contract.customer_id) & (Customer.team_contact_id == user.id)
+                result = Customer.select().where(condition).exists()
                 if result:
                     return True, None
                 else:
@@ -68,12 +106,11 @@ def is_my_customer(user, event_id):
             else:
                 return False, "Le contrat n'a pas de client associé."
         else:
-            return False, "Impossible de trouver le contrat associé à cet événement."
-            
-    except DoesNotExist:
-        return False, f"L'événement {event_id} n'existe pas."
+            return False, "Impossible de trouver le contrat associé."
+
     except Exception as e:
         return False, f"Erreur lors de la vérification des permissions: {str(e)}"
+
 
 # Defining all pemission cases
 ROLES_PERMISSIONS = {
@@ -87,7 +124,7 @@ ROLES_PERMISSIONS = {
             "create": always_true,
             "read": always_true,
             "list": always_true,
-            "update": is_self
+            "update": always_true
         },
         "customer": {
             "read": always_true,
@@ -103,6 +140,9 @@ ROLES_PERMISSIONS = {
             "read": always_true,
             "list": always_true,
             "update": always_true
+        },
+        "debug": {
+            "commands": always_true
         }
     },
     "sales": {
@@ -123,10 +163,13 @@ ROLES_PERMISSIONS = {
             "update": is_owner
         },
         "event": {
-            "create": is_my_customer,
+            "create": always_true,
             "read": always_true,
             "list": always_true,
             "update": is_my_customer
+        },
+        "debug": {
+            "commands": always_true
         }
     },
     "support": {
@@ -145,10 +188,15 @@ ROLES_PERMISSIONS = {
         },
         "event": {
             "list": always_true,
-            "read": always_true
+            "read": always_true,
+            "update": is_owner
+        },
+        "debug": {
+            "commands": always_true
         }
     }
 }
+
 
 def get_all_permissions():
     """Returns a list of all permissions in the system."""
@@ -191,6 +239,7 @@ def get_all_permissions():
 
     return all_permissions
 
+
 def has_permission(user: User, resource: str, action: str, target: Any = None) -> bool:
     """ Checks if user has permission to perform a specific action on a given resource.
 
@@ -217,16 +266,16 @@ def has_permission(user: User, resource: str, action: str, target: Any = None) -
 
     # Special case for is_my_customer which returns a tuple (success, error_message)
     if permission_func == is_my_customer:
-        return permission_func(user, target)
+        return permission_func(user, target, resource)
 
     # For other permission functions that only return a boolean
     if target is None:
         result = permission_func()
     else:
-        result = permission_func(user, target)
- 
+        result = permission_func(user, target, resource)
+
     if result:
         return True, None
     else:
         # Generic error message for other permission functions
-        return False, f"Vous n'avez pas l'autorisation requise pour cette action."
+        return False, "Vous n'avez pas l'autorisation requise pour cette action."
