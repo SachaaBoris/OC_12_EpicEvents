@@ -1,5 +1,6 @@
+.venv\Scripts\activate
 # OC_12 EpicEvents BackEnd CRM  
-
+  
 <p align="center"><img src="https://github.com/SachaaBoris/OC_12_EpicEvents/blob/main/static/logo_w.png" width="346"/></p>
   
 # ● Description du projet  
@@ -7,7 +8,8 @@ EpicEvents CRM est une application de gestion locale, conçue pour collecter, tr
   
 # ● Comment installer et démarrer l'application  
 1. Prérequis :  
-    Avoir Python 3 et PostgreSql installés  
+    Avoir Python 3.x installé  
+	PostgreSql installé et configuré  
     Avoir téléchargé et dézipé l'archive du projet sur votre disque dur,  
     Ou clonez le repo avec cette commande :  
   ```  
@@ -16,10 +18,10 @@ EpicEvents CRM est une application de gestion locale, conçue pour collecter, tr
   
 2. Configurer l'environement :    
 	Rennomez .env.sample en .env  
-	Editez les différentes variables selon vos préférences / votre config.
+	Editez les différentes variables selon vos préférences / votre config.  
 
 3. Démarrer le serveur :  
-	Depuis votre console favorite, rendez-vous dans le dossier d'installation PostGre et executez : `pg_ctl -D chemin\vers\votre\bdd start`
+	Depuis votre console favorite, rendez-vous dans le dossier d'installation PostGre et executez : `pg_ctl -D chemin\vers\votre\bdd start`  
 
 4. Installer l'environnement virtuel et les librairies :  
     Toujours depuis votre console, naviguez jusqu'au repertoire de l'app EpicEvents  
@@ -27,8 +29,10 @@ EpicEvents CRM est une application de gestion locale, conçue pour collecter, tr
     Activez ensuite l'environnement virtuel en rentrant la commande : `venv\Scripts\activate`  
     Installer les requirements du projet avec la commande : `py -m pip install -r requirements.txt`  
   
-5. Creer la nouvelle table :  
-    Maintenant que votre environement est prêt, rentrez la commande : `py -m epicevents create_db.py`
+5. Creer les nouvelles tables :  
+    Maintenant que votre environement est prêt, rentrez la commande : `py -m epicevents create_db.py`  
+	Un prompt vous proposera de créer des données de tests du fichier utils/create_test_data.py.  
+	(vous trouverez si besoin les données d'authentification des utilisateurs test dans ce fichier)  
   
   
 # ● Comment utiliser l'application  
@@ -36,15 +40,12 @@ Les différents points d'entrées sont :
 | Commande      | Description                                         |
 |--------------|-----------------------------------------------------|
 | `--help`     | Print l'aide (accessible dans tous les points d'entrée) |
-| `login`      | Authentification                                   |
-| `logout`     | Déconnexion                                       |
-| `debug_token`| Vérification de la validité du token              |
 | `users`      | Gestion des utilisateurs                          |
 | `customers`  | Gestion des clients                               |
 | `contracts`  | Gestion des contrats                              |
 | `events`     | Gestion des événements                            |
 
-Exemple de commande : `py epicevents login --username Admin_test --password ADMIN_PASS`  
+Exemple de commande : `py -m epicevents user login -u Username -p U$3rP@sS`  
   
   
 6. Arrêter le serveur :   

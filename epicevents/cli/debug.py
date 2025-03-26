@@ -2,7 +2,7 @@ import typer
 from rich.console import Console
 from datetime import datetime
 from epicevents.permissions.auth import verify_token
-from epicevents.permissions.auth import get_all_permissions
+from epicevents.permissions.perm import get_all_permissions
 from epicevents.cli.utils import display_list
 from epicevents.cli.utils import format_text
 
@@ -139,3 +139,9 @@ def list_commands(ctx: typer.Context):
         # Filter command groups based on the user's role
         filtered_command_groups = role_commands_filter(user_role, command_groups)
         print_command_list(user_role, filtered_command_groups)
+
+@app.command("sentry")
+def sentry_error():
+    """Simple error test sent to sentry."""
+    #  division_by_zero = 1 / 0
+    raise RuntimeError("Erreur test envoyée à Sentry")

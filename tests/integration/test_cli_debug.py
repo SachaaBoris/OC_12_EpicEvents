@@ -8,7 +8,7 @@ from epicevents.models.role import Role
 from epicevents.models.database import BaseModel
 from epicevents.permissions.auth import generate_token
 from epicevents.permissions.auth import remove_token
-from epicevents.permissions.auth import get_all_permissions
+from epicevents.permissions.perm import get_all_permissions
 from epicevents.cli.debug import app
 from epicevents.cli.debug import list_commands
 from epicevents.cli.debug import debug_token

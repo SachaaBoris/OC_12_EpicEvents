@@ -245,24 +245,7 @@ def test_user_verify_password_incorrect(monkeypatch):
 
 def test_user_get_data(monkeypatch):
     """Test de la méthode get_data de User"""
-    import datetime as dt_module
-    
-    # Créer une date fixe
-    fixed_datetime = dt_module.datetime(2023, 1, 1, 12, 0, 0)
-    
-    # Créer un module mock pour datetime
-    class MockDatetime:
-        @staticmethod
-        def now(tz=None):
-            return fixed_datetime
-        
-        # Conserver les autres attributs/méthodes de datetime
-        timezone = dt_module.timezone
-        timedelta = dt_module.timedelta
-    
-    # Remplacer tout le module datetime dans le module user
-    monkeypatch.setattr('epicevents.models.user.datetime', MockDatetime)
-    
+      
     # Remplacer directement la méthode get_data pour éviter l'accès à la base de données
     def mock_get_data(self):
         return {

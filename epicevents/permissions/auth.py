@@ -75,6 +75,25 @@ def verify_token() -> Optional[dict]:
         return None
 
 
+# Password remove from sys.argv
+def sanitize_argv():
+    if len(sys.argv) >= 3 and sys.argv[1] == "user" and sys.argv[2] == "login":
+        sanitized_args = []
+        skip_next = False
+
+        for arg in sys.argv:
+            if skip_next:
+                sanitized_args.append("****")  # Masque l'argument sensible
+                skip_next = False
+            elif arg.lower() in ["-p", "-password", "-pass", "--p", "--password", "--pass"]:
+                sanitized_args.append(arg)
+                skip_next = True
+            else:
+                sanitized_args.append(arg)
+
+        sys.argv = sanitized_args
+
+
 def authenticate_user(username: str, password: str) -> Optional[dict]:
     """Authenticates a user and generates a token."""
     try:
@@ -83,6 +102,17 @@ def authenticate_user(username: str, password: str) -> Optional[dict]:
         console.print(
             format_text('bold', 'red', "❌ Utilisateur non trouvé.")
         )
+
+        if SENTRY_ENV == "production":
+            # Sends to Sentry if we're in production
+            sanitize_argv()
+            error_log = f"Utilisateur inexistant : '{username}'."
+            sentry_sdk.set_extra("event_details", {
+                "event": "unexisting user",
+                "source": username,
+            })
+            sentry_sdk.capture_message(error_log, level="warning")
+
         return None
 
     try:
@@ -91,6 +121,17 @@ def authenticate_user(username: str, password: str) -> Optional[dict]:
         console.print(
             format_text('bold', 'red', "❌ Mot de passe incorrect.")
         )
+
+        if SENTRY_ENV == "production":
+            # Sends to Sentry if we're in production
+            sanitize_argv()
+            error_log = f"Mot de passe erroné : '{username}'."
+            sentry_sdk.set_extra("event_details", {
+                "event": "wrong pw",
+                "source": username,
+            })
+            sentry_sdk.capture_message(error_log, level="warning")
+
         return None
 
     token = generate_token(user)
@@ -144,17 +185,14 @@ def check_auth(ctx: typer.Context) -> None:
 
     if SENTRY_ENV == "production":
         # Sends to Sentry if we're in production
-        sentry_sdk.capture_message(
-            error_log,
-            level="warning",
-            scope=sentry_sdk.Scope().set_context("auth", {
-                "user_id": user.id,
-                "username": user.username,
-                "resource": resource,
-                "action": action,
-                "target_id": target_id
-            })
-        )
+        sentry_sdk.set_extra("event_details", {
+            "event": "unauthorized",
+            "source_id": user.id,
+            "resource": resource,
+            "action": action,
+            "target_id": target_id
+        })
+        sentry_sdk.capture_message(error_log, level="warning")
 
     raise typer.Exit(1)
 

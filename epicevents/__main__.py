@@ -1,3 +1,4 @@
+import sys
 import sentry_sdk
 from epicevents.cli import init_cli
 from epicevents.config import SENTRY_DSN, SENTRY_ENV
@@ -8,8 +9,8 @@ def sentry_init():
     """
     Sentry has a few entries in the app :
     - In the __main__ script to log unhandled errors.
-    - In epicevents.permissions.auth.check_auth() to log forbidden activities.
-    - In epicevents.cli.users.login() to log authentication failures.
+    - In epicevents.permissions.auth.check_auth() & authenticate_user()
+      to log forbidden activities & authentication failures.
     """
     if SENTRY_DSN != "https://SENTRYKEY.ingest.de.sentry.io/PROJECTCODE":
         sentry_sdk.init(
@@ -17,8 +18,6 @@ def sentry_init():
             environment=SENTRY_ENV,
             traces_sample_rate=0.0  # deactivates perf tracking
         )
-        # Sentry ErrorTest
-        # division_by_zero = 1 / 0
 
 
 # Main app entry point

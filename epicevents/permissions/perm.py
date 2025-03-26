@@ -30,7 +30,7 @@ def is_owner(user, entity_or_id, resource):
         if resource not in ['customer', 'contract', 'event']:
             return False
 
-        # Si on nous a passé un ID, on récupère l'entité
+        # Get entity or ID
         if isinstance(entity_or_id, (int, str)):
             try:
                 if resource == 'customer':
@@ -44,17 +44,17 @@ def is_owner(user, entity_or_id, resource):
             except DoesNotExist:
                 return False
         else:
-            # Si on nous a passé l'entité directement
             entity = entity_or_id
 
-        # Vérification du propriétaire
+        # Check owner
         if hasattr(entity, 'team_contact_id'):
             if hasattr(user, 'id'):
-                return entity.team_contact_id == user.id
+                return entity.team_contact_id.id == user.id
             else:
                 return entity.team_contact_id == user
 
-    except Exception:
+    except Exception as e:
+        print(f"[ERROR] Exception in is_owner: {e}")
         return False
 
     return False
@@ -124,7 +124,7 @@ ROLES_PERMISSIONS = {
             "create": always_true,
             "read": always_true,
             "list": always_true,
-            "update": always_true
+            "update": is_self
         },
         "customer": {
             "read": always_true,

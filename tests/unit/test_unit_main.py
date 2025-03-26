@@ -1,20 +1,40 @@
 import pytest
 import typer
+import sentry_sdk
 import epicevents.__main__
 from epicevents.__main__ import sentry_init, main
 from epicevents.cli import init_cli, app
+from epicevents.config import SENTRY_DSN, SENTRY_ENV
 
 
 def test_sentry_init(monkeypatch):
     """
     Teste que sentry_init fonctionne correctement et n'appelle pas sentry_sdk.init
-    quand SENTRY_DSN est la valeur par défaut
+    quand SENTRY_DSN est la valeur par défaut.
     """
-    # Mock SENTRY_DSN pour qu'il entre dans la condition if
+    # Mock SENTRY_DSN pour entrer dans la condition if
     monkeypatch.setattr("epicevents.__main__.SENTRY_DSN", "https://real-dsn.sentry.io/123")
-    
-    # La fonction pass actuellement dans le code, donc rien ne devrait se passer
-    sentry_init()  # Ne devrait pas lever d'exception
+
+    # Variable pour suivre si sentry_sdk.init a été appelé
+    init_called = []
+
+    def fake_init(*args, **kwargs):
+        """Remplace sentry_sdk.init et enregistre son appel."""
+        init_called.append((args, kwargs))
+
+    # Monkeypatch sentry_sdk.init
+    monkeypatch.setattr(sentry_sdk, "init", fake_init)
+
+    # Appeler la fonction
+    sentry_init()
+
+    # Vérifier que sentry_sdk.init a été appelé une seule fois avec les bons arguments
+    assert len(init_called) == 1
+    assert init_called[0][1] == {
+        "dsn": "https://real-dsn.sentry.io/123",
+        "environment": SENTRY_ENV,
+        "traces_sample_rate": 0.0
+    }
 
 
 def test_main(monkeypatch):
@@ -133,7 +153,7 @@ def test_init_cli():
             {'name': 'customer', 'help': 'Gestion des clients'},
             {'name': 'contract', 'help': 'Gestion des contrats'},
             {'name': 'event', 'help': 'Gestion des événements'},
-            {'name': 'debug', 'help': 'Fonctions de debug (admin)'}
+            {'name': 'debug', 'help': 'Fonctions de debug'}
         ]
         
         # Vérifier que chaque sous-commande attendue est présente

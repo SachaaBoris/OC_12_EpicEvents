@@ -18,6 +18,6 @@ def init_cli():
     app.add_typer(customers.app, name="customer", help="Gestion des clients", callback=check_auth)
     app.add_typer(contracts.app, name="contract", help="Gestion des contrats", callback=check_auth)
     app.add_typer(events.app, name="event", help="Gestion des événements", callback=check_auth)
-    app.add_typer(debug.app, name="debug", help="Fonctions de debug (admin)", callback=check_auth)
+    app.add_typer(debug.app, name="debug", help="Fonctions de debug", callback=check_auth)
 
     return app

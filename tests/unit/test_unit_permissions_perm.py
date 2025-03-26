@@ -126,9 +126,14 @@ def test_is_owner():
         def __init__(self, id):
             self.id = id
     
+    class TeamContact:
+        def __init__(self, id):
+            self.id = id
+            
     class Customer:
         def __init__(self, team_contact_id):
-            self.team_contact_id = team_contact_id
+            # Créer un objet TeamContact avec l'ID fourni
+            self.team_contact_id = TeamContact(team_contact_id)
     
     # Créer un utilisateur
     user = User(1)
@@ -143,7 +148,7 @@ def test_is_owner():
     assert result is True
     
     # Tester avec un ID différent
-    customer.team_contact_id = 2
+    customer.team_contact_id = TeamContact(2)  # Remplacer par un nouvel objet, pas juste un ID
     result = is_owner(user, customer, "customer")
     
     # Vérifier que le résultat est False
@@ -161,10 +166,16 @@ def test_is_owner_edge_cases():
         def __int__(self):
             return self.id
     
+    # Créer une classe pour team_contact_id
+    class TeamContact:
+        def __init__(self, id):
+            self.id = id
+    
     # Créer différents types d'objets
     class ObjectWithTeamContactId:
         def __init__(self, id):
-            self.team_contact_id = id
+            # Créer un objet TeamContact avec l'ID fourni
+            self.team_contact_id = TeamContact(id)
     
     class ObjectWithoutTeamContactId:
         def __init__(self):
@@ -173,11 +184,11 @@ def test_is_owner_edge_cases():
     # Créer l'utilisateur
     user = User(1)
     
-    # Test avec un objet où user.id == object.team_contact_id
+    # Test avec un objet où user.id == object.team_contact_id.id
     obj1 = ObjectWithTeamContactId(1)
     assert is_owner(user, obj1, "customer") is True
     
-    # Test avec un objet où user.id != object.team_contact_id
+    # Test avec un objet où user.id != object.team_contact_id.id
     obj2 = ObjectWithTeamContactId(2)
     assert is_owner(user, obj2, "contract") is False
     
